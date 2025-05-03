@@ -1,0 +1,8 @@
+description: GUI menu
+url: https://github.com/badgeteam/esp32-component-badgelink
+repository: git://git@github.com:badgeteam/esp32-component-badgelink.git
+issues: https://github.com/badgeteam/esp32-component-badgelink/issues
+dependencies:
+  idf: ">=5.4"
+  badgeteam/appfs: ">=1.0.1"
+license: "MIT"

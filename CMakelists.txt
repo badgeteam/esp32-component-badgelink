@@ -1,0 +1,19 @@
+idf_component_register(
+	SRCS
+		nanopb/pb_common.c
+		nanopb/pb_decode.c
+		nanopb/pb_encode.c
+		badgelink_appfs.c
+		badgelink_fs.c
+		badgelink_nvs.c
+		badgelink_startapp.c
+		badgelink.c
+		badgelink.pb.c
+		cobs.c
+	INCLUDE_DIRS
+		"."
+		"nanopb"
+	REQUIRES
+		appfs
+		nvs_flash
+)

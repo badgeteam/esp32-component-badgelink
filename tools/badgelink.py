@@ -1040,7 +1040,7 @@ if __name__ == "__main__":
             if args.action == "list":
                 entries = link.appfs_list()
                 if entries:
-                    print_table(["slug", "title", "ver", "size"], [[e.slug, e.title, str(e.version), f"{e.size//1024}K"] for e in entries])
+                    print_table(["slug", "title", "version", "size"], [[e.slug, e.title, str(e.version), f"{e.size//1024}K"] for e in entries])
             
             elif args.action == "stat":
                 metadata = link.appfs_stat(args.slug)

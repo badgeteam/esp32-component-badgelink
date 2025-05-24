@@ -1,0 +1,5 @@
+# MCH2022 badge (Current non-badgelink firmware) and Tanmatsu (v0.0.2 firmware)
+ATTRS{idVendor}=="16d0", ATTRS{idProduct}=="0f9a", MODE="666"
+
+# MCH2022 badge (Future firmware)
+ATTRS{idVendor}=="1209", ATTRS{idProduct}=="4200", MODE="666"

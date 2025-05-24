@@ -1,15 +1,22 @@
 #!/usr/bin/env python3
 
-from badgelink_pb2 import *
+# System libraries
+import struct
+import time
+import os
+import sys
+import random
 from serial import Serial, SerialException
 from cobs import cobs
 from zlib import crc32
-from device import BadgeUSB
 from usb import USBError
 from argparse import ArgumentParser, ArgumentTypeError
 from datetime import datetime
 from typing import BinaryIO
-import struct, time, os, sys, random
+
+# Custom libraries
+from libraries.badgelink_pb2 import *
+from libraries.device import BadgeUSB
 
 
 nvs_untypes = {

@@ -2,7 +2,7 @@
 // SPDX-Copyright-Text: 2025 Julian Scheffers
 // SPDX-License-Identifier: MIT
 
-#include "../usb_device.h"
+#include "badgelink.h"
 #include "assert.h"
 #include "badgelink_appfs.h"
 #include "badgelink_fs.h"
@@ -29,6 +29,8 @@ typedef struct {
     uint8_t data[31];
     uint8_t len;
 } fragment_t;
+
+static usb_callback_t usb_send_data_cb = NULL;
 
 // Badgelink packet singleton used for both the request and its response.
 badgelink_Packet badgelink_packet;
@@ -60,7 +62,8 @@ void badgelink_init() {
 }
 
 // Start the badgelink service.
-void badgelink_start() {
+void badgelink_start(usb_callback_t usb_callback) {
+    usb_send_data_cb = usb_callback;
     xTaskCreate(badgelink_thread_main, "BadgeLink", 8192, NULL, 0, &badgelink_thread_handle);
 }
 
@@ -112,7 +115,9 @@ void badgelink_send_packet() {
 #endif
 
     // Send the raw frame.
-    usb_send_data(frame_buffer, encoded_len);
+    if (usb_send_data_cb != NULL) {
+        usb_send_data_cb(frame_buffer, encoded_len);
+    }
 }
 
 // Send a status response packet.

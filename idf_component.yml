@@ -1,4 +1,4 @@
-description: GUI menu
+description: Protobuf protocol for managing basic device functions
 url: https://github.com/badgeteam/esp32-component-badgelink
 repository: git://git@github.com:badgeteam/esp32-component-badgelink.git
 issues: https://github.com/badgeteam/esp32-component-badgelink/issues

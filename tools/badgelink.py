@@ -995,7 +995,7 @@ if __name__ == "__main__":
         else:
             port = BadgeUSB()
     except FileNotFoundError:
-        print("Badge not found")
+        print("Badge not found. Make sure that your badge is connected, powered on and in USB mode. To place your badge in USB mode, go to the launcher home screen and press the purple diamond. Verify that a USB icon is shown in the top right, next to the battery")
         sys.exit(1)
     
     try:

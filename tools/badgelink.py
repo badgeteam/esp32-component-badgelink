@@ -115,7 +115,7 @@ class NotFoundError(BadgeError):
     Raised by the badge if a request requires something that was not found.
     """
     def __init__(self, thing: str = None):
-        super().__init__(StatusCode.StatusNotFound, f"{thing or "Requested file/resource"} not found")
+        super().__init__(StatusCode.StatusNotFound, f'{thing or "Requested file/resource"} not found')
 
 class IllegalStateError(BadgeError):
     """
@@ -1077,7 +1077,7 @@ if __name__ == "__main__":
             
             elif args.action == "stat":
                 stat = link.fs_stat(args.file)
-                print(f"Type:     {"directory" if stat.is_dir else "file"}")
+                print(f'Type:     {"directory" if stat.is_dir else "file"}')
                 print(f"Size:     {stat.size}")
                 print(f"Created:  {datetime.fromtimestamp(stat.ctime / 1000)}")
                 print(f"Modified: {datetime.fromtimestamp(stat.mtime / 1000)}")

@@ -87,6 +87,10 @@ void badgelink_fs_xfer_download() {
         ESP_LOGE(TAG, "%s: Unknown errno %d", __FUNCTION__, errno);
         badgelink_status_int_err();
     } else {
+        // For protocol version 2+, compute streaming CRC during download.
+        if (badgelink_get_protocol_version() >= 2) {
+            running_crc = esp_crc32_le(running_crc, chunk->data.bytes, chunk->data.size);
+        }
         badgelink_send_packet();
     }
 }
@@ -118,7 +122,20 @@ void badgelink_fs_xfer_stop(bool abnormal) {
     } else {
         ESP_LOGI(TAG, "FS download finished");
         fclose(xfer_fd);
-        badgelink_status_ok();
+
+        // For protocol version 2+, send the final CRC.
+        if (badgelink_get_protocol_version() >= 2) {
+            badgelink_packet.which_packet                = badgelink_Packet_response_tag;
+            badgelink_packet.packet.response.status_code = badgelink_StatusCode_StatusOk;
+            badgelink_packet.packet.response.which_resp  = badgelink_Response_fs_resp_tag;
+            badgelink_FsActionResp* resp                 = &badgelink_packet.packet.response.resp.fs_resp;
+            resp->which_val                              = badgelink_FsActionResp_crc32_tag;
+            resp->val.crc32                              = running_crc;
+            resp->size                                   = badgelink_xfer_size;
+            badgelink_send_packet();
+        } else {
+            badgelink_status_ok();
+        }
     }
 }
 
@@ -269,17 +286,31 @@ void badgelink_fs_download() {
         return;
     }
 
-    // Calculate file CRC32.
-    uint8_t  tmp[128];
-    uint32_t crc    = 0;
-    uint32_t size   = 0;
-    uint32_t rcount = 1;
-    while (rcount) {
-        rcount  = fread(tmp, 1, sizeof(tmp), xfer_fd);
-        crc     = esp_crc32_le(crc, tmp, rcount);
-        size   += rcount;
+    uint32_t crc  = 0;
+    uint32_t size = 0;
+
+    if (badgelink_get_protocol_version() >= 2) {
+        // Protocol version 2+: use stat() for size, CRC will be computed during transfer.
+        struct stat statbuf;
+        if (fstat(fileno(xfer_fd), &statbuf)) {
+            ESP_LOGE(TAG, "%s: fstat failed, errno %d", __FUNCTION__, errno);
+            fclose(xfer_fd);
+            badgelink_status_int_err();
+            return;
+        }
+        size        = statbuf.st_size;
+        running_crc = 0;
+    } else {
+        // Protocol version 1: calculate CRC32 upfront by reading entire file.
+        uint8_t  tmp[128];
+        uint32_t rcount = 1;
+        while (rcount) {
+            rcount = fread(tmp, 1, sizeof(tmp), xfer_fd);
+            crc    = esp_crc32_le(crc, tmp, rcount);
+            size  += rcount;
+        }
+        fseek(xfer_fd, 0, SEEK_SET);
     }
-    fseek(xfer_fd, 0, SEEK_SET);
 
     // Set up transfer.
     badgelink_xfer_type      = BADGELINK_XFER_FS;

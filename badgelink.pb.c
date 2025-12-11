@@ -18,6 +18,12 @@ PB_BIND(badgelink_Response, badgelink_Response, 4)
 PB_BIND(badgelink_StartAppReq, badgelink_StartAppReq, AUTO)
 
 
+PB_BIND(badgelink_VersionReq, badgelink_VersionReq, AUTO)
+
+
+PB_BIND(badgelink_VersionResp, badgelink_VersionResp, AUTO)
+
+
 PB_BIND(badgelink_Chunk, badgelink_Chunk, 4)
 
 

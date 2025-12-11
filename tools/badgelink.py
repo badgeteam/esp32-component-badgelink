@@ -1093,7 +1093,7 @@ if __name__ == "__main__":
     
     try:
         if args.port:
-            port = Serial(port=args.port, baudrate=4000000)
+            port = Serial(port=args.port, baudrate=115200)
         elif args.inpipe:
             infd = open(args.inpipe, "rb")
             outfd = open(args.outpipe, "wb")

@@ -13,6 +13,8 @@ static char const TAG[] = "badgelink_appfs";
 static appfs_handle_t xfer_fd;
 // CRC32 of file transferred.
 static uint32_t       xfer_crc32;
+// Running CRC32 computed during upload.
+static uint32_t       running_crc;
 
 // Calculate the CRC32 of an AppFS file.
 static uint32_t calc_app_crc32(appfs_handle_t fd) {
@@ -69,6 +71,7 @@ void badgelink_appfs_xfer_upload() {
         ESP_LOGE(TAG, "%s: error %s", __FUNCTION__, esp_err_to_name(ec));
         badgelink_status_int_err();
     } else {
+        running_crc = esp_crc32_le(running_crc, chunk->data.bytes, chunk->data.size);
         badgelink_status_ok();
     }
 }
@@ -108,10 +111,9 @@ void badgelink_appfs_xfer_stop(bool abnormal) {
             appfsDeleteFile(name);
 
         } else {
-            uint32_t actual_crc32 = calc_app_crc32(xfer_fd);
-            if (actual_crc32 != xfer_crc32) {
+            if (running_crc != xfer_crc32) {
                 ESP_LOGE(TAG, "AppFS upload CRC32 mismatch; expected %08" PRIx32 ", actual %08" PRIx32, xfer_crc32,
-                         actual_crc32);
+                         running_crc);
                 badgelink_status_int_err();
 
                 // AppFS can delete by fd so this is the workaround.
@@ -251,6 +253,7 @@ void badgelink_appfs_upload() {
     badgelink_xfer_pos       = 0;
     badgelink_xfer_size      = req->id.metadata.size;
     xfer_crc32               = req->crc32;
+    running_crc              = 0;
 
     // This OK response officially starts the transfer.
     ESP_LOGI(TAG, "AppFS upload started");

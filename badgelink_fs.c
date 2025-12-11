@@ -18,6 +18,7 @@ static char const TAG[] = "badgelink_fs";
 static char     xfer_path[256];
 static FILE*    xfer_fd;
 static uint32_t xfer_crc32;
+static uint32_t running_crc;
 
 // Handle a FS request packet.
 void badgelink_fs_handle() {
@@ -68,6 +69,7 @@ void badgelink_fs_xfer_upload() {
             badgelink_status_int_err();
         }
     } else {
+        running_crc = esp_crc32_le(running_crc, chunk->data.bytes, chunk->data.size);
         badgelink_status_ok();
     }
 }
@@ -101,38 +103,11 @@ void badgelink_fs_xfer_stop(bool abnormal) {
         }
 
     } else if (badgelink_xfer_is_upload) {
-        // Double-check file CRC32.
-        uint32_t crc = 0;
-        uint8_t  tmp[128];
-        fseek(xfer_fd, 0, SEEK_SET);
-        for (uint32_t i = 0; i < badgelink_xfer_size; i += sizeof(tmp)) {
-            uint32_t max         = sizeof(tmp) < badgelink_xfer_size - i ? sizeof(tmp) : badgelink_xfer_size - i;
-            uint32_t actual_read = fread(tmp, 1, max, xfer_fd);
-            if (actual_read != max) {
-                long pos = ftell(xfer_fd);
-                ESP_LOGE(TAG,
-                         "Read too little while checking CRC32; expected %" PRIu32 ", got %" PRIu32 " at offset %ld",
-                         max, actual_read, pos);
-                fclose(xfer_fd);
-                unlink(xfer_path);
-                badgelink_status_int_err();
-                return;
-            }
-            crc = esp_crc32_le(crc, tmp, max);
-        }
-
         fclose(xfer_fd);
 
-        if (crc != xfer_crc32) {
-            ESP_LOGE(TAG, "FS upload CRC32 mismatch; expected %08" PRIx32 ", actual %08" PRIx32, xfer_crc32, crc);
-            fseek(xfer_fd, 0, SEEK_SET);
-            printf("Data:");
-            for (size_t i = 0; i < badgelink_xfer_size; i++) {
-                uint8_t c;
-                fread(&c, 1, 1, xfer_fd);
-                printf(" %02x", c);
-            }
-            printf("\n");
+        if (running_crc != xfer_crc32) {
+            ESP_LOGE(TAG, "FS upload CRC32 mismatch; expected %08" PRIx32 ", actual %08" PRIx32, xfer_crc32,
+                     running_crc);
             unlink(xfer_path);
             badgelink_status_int_err();
         } else {
@@ -263,6 +238,7 @@ void badgelink_fs_upload() {
     badgelink_xfer_size      = req->size;
     badgelink_xfer_pos       = 0;
     xfer_crc32               = req->crc32;
+    running_crc              = 0;
 
     // This OK response officially starts the transfer.
     ESP_LOGI(TAG, "FS upload started");

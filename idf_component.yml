@@ -1,8 +1,12 @@
-description: Protobuf protocol for managing basic device functions
-url: https://github.com/badgeteam/esp32-component-badgelink
-repository: git://git@github.com:badgeteam/esp32-component-badgelink.git
-issues: https://github.com/badgeteam/esp32-component-badgelink/issues
 dependencies:
-  idf: ">=5.4"
-  badgeteam/appfs: ">=1.0.1"
-license: "MIT"
+  badgeteam/appfs: '>=1.0.1'
+  idf: '>=5.4'
+description: Protobuf protocol for managing basic device functions
+issues: https://github.com/badgeteam/esp32-component-badgelink/issues
+license: MIT
+repository: git://github.com/badgeteam/esp32-component-badgelink.git
+repository_info:
+  commit_sha: aff9b2bbad34db5fc873c66bef247bfbf4ef6328
+  path: .
+url: https://github.com/badgeteam/esp32-component-badgelink
+version: 0.0.4

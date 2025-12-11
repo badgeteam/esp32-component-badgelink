@@ -6,17 +6,65 @@
 #include "dirent.h"
 #include "errno.h"
 #include "esp_crc.h"
+#include "esp_heap_caps.h"
 #include "esp_log.h"
 #include "fcntl.h"
 #include "stdio.h"
+#include "string.h"
 #include "sys/stat.h"
 #include "sys/types.h"
 #include "unistd.h"
 
 static char const TAG[] = "badgelink_fs";
 
+// Fast SD I/O helpers - use internal DMA RAM for stdio buffers
+#ifdef CONFIG_SD_FAST_IO
+#define BADGELINK_STDIO_BUF_SIZE 8192
+
+static FILE*  bl_fast_file   = NULL;
+static void*  bl_fast_buffer = NULL;
+
+static FILE* bl_sd_fopen(const char* path, const char* mode) {
+    FILE* f = fopen(path, mode);
+    if (f == NULL) return NULL;
+
+    // Allocate stdio buffer in internal DMA-capable RAM for fast SD card access
+    void* buf = heap_caps_malloc(BADGELINK_STDIO_BUF_SIZE, MALLOC_CAP_DMA | MALLOC_CAP_INTERNAL);
+    if (buf != NULL) {
+        setvbuf(f, buf, _IOFBF, BADGELINK_STDIO_BUF_SIZE);
+        bl_fast_file   = f;
+        bl_fast_buffer = buf;
+    }
+    return f;
+}
+
+static void bl_sd_fclose(FILE* f) {
+    if (f == NULL) return;
+
+    // Check if this file has a tracked fast buffer
+    if (bl_fast_file == f && bl_fast_buffer != NULL) {
+        fclose(f);
+        free(bl_fast_buffer);
+        bl_fast_file   = NULL;
+        bl_fast_buffer = NULL;
+        return;
+    }
+    fclose(f);
+}
+#else
+// Fallback: just use regular fopen/fclose
+static inline FILE* bl_sd_fopen(const char* path, const char* mode) {
+    return fopen(path, mode);
+}
+
+static inline void bl_sd_fclose(FILE* f) {
+    if (f != NULL) fclose(f);
+}
+#endif
+
 static char     xfer_path[256];
 static FILE*    xfer_fd;
+static bool     xfer_is_sd;
 static uint32_t xfer_crc32;
 static uint32_t running_crc;
 
@@ -98,7 +146,11 @@ void badgelink_fs_xfer_download() {
 // Finish a FS transfer.
 void badgelink_fs_xfer_stop(bool abnormal) {
     if (abnormal) {
-        fclose(xfer_fd);
+        if (xfer_is_sd) {
+            bl_sd_fclose(xfer_fd);
+        } else {
+            fclose(xfer_fd);
+        }
         if (badgelink_xfer_is_upload) {
             ESP_LOGE(TAG, "FS upload aborted");
             unlink(xfer_path);
@@ -107,7 +159,11 @@ void badgelink_fs_xfer_stop(bool abnormal) {
         }
 
     } else if (badgelink_xfer_is_upload) {
-        fclose(xfer_fd);
+        if (xfer_is_sd) {
+            bl_sd_fclose(xfer_fd);
+        } else {
+            fclose(xfer_fd);
+        }
 
         if (running_crc != xfer_crc32) {
             ESP_LOGE(TAG, "FS upload CRC32 mismatch; expected %08" PRIx32 ", actual %08" PRIx32, xfer_crc32,
@@ -121,7 +177,11 @@ void badgelink_fs_xfer_stop(bool abnormal) {
 
     } else {
         ESP_LOGI(TAG, "FS download finished");
-        fclose(xfer_fd);
+        if (xfer_is_sd) {
+            bl_sd_fclose(xfer_fd);
+        } else {
+            fclose(xfer_fd);
+        }
 
         // For protocol version 2+, send the final CRC.
         if (badgelink_get_protocol_version() >= 2) {
@@ -236,7 +296,8 @@ void badgelink_fs_upload() {
 
     // Open target file for writing.
     strlcpy(xfer_path, req->path, sizeof(xfer_path));
-    xfer_fd = fopen(req->path, "w+b");
+    xfer_is_sd = (strncmp(req->path, "/sd", 3) == 0);
+    xfer_fd    = xfer_is_sd ? bl_sd_fopen(req->path, "w+b") : fopen(req->path, "w+b");
     if (!xfer_fd) {
         if (errno == ENOENT) {
             badgelink_status_not_found();
@@ -273,7 +334,8 @@ void badgelink_fs_download() {
 
     // Open target file for reading.
     strlcpy(xfer_path, req->path, sizeof(xfer_path));
-    xfer_fd = fopen(req->path, "rb");
+    xfer_is_sd = (strncmp(req->path, "/sd", 3) == 0);
+    xfer_fd    = xfer_is_sd ? bl_sd_fopen(req->path, "rb") : fopen(req->path, "rb");
     if (!xfer_fd) {
         if (errno == ENOENT) {
             badgelink_status_not_found();
@@ -294,7 +356,11 @@ void badgelink_fs_download() {
         struct stat statbuf;
         if (fstat(fileno(xfer_fd), &statbuf)) {
             ESP_LOGE(TAG, "%s: fstat failed, errno %d", __FUNCTION__, errno);
-            fclose(xfer_fd);
+            if (xfer_is_sd) {
+                bl_sd_fclose(xfer_fd);
+            } else {
+                fclose(xfer_fd);
+            }
             badgelink_status_int_err();
             return;
         }

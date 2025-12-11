@@ -58,7 +58,7 @@ static void          badgelink_thread_main(void*);
 
 // Prepare the data for the BadgeLink service to start.
 void badgelink_init() {
-    rxqueue = xQueueCreate(16, sizeof(fragment_t));
+    rxqueue = xQueueCreate(256, sizeof(fragment_t));
 }
 
 // Start the badgelink service.

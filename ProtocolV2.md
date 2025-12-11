@@ -87,26 +87,6 @@ Version 2 changes how file downloads work to improve performance for large files
 
 **Benefit**: Download starts immediately without reading the entire file first.
 
-### Client Implementation for Downloads
-
-```
-1. Send download request
-2. Receive initial response with size (and crc32)
-3. If protocol version >= 2:
-   - Ignore crc32 field (it will be 0)
-   - Initialize local running_crc = 0
-4. Request chunks with XferContinue
-5. For each chunk received:
-   - Update local running_crc
-6. Send XferFinish
-7. If protocol version >= 2:
-   - Receive FsActionResp/AppfsActionResp with final crc32
-   - Compare with local running_crc
-8. If protocol version 1:
-   - Receive StatusOk
-   - Compare local running_crc with crc32 from step 2
-```
-
 ### Response Differences
 
 | Event | Version 1 | Version 2 |

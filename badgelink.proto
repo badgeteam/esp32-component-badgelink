@@ -1,0 +1,210 @@
+syntax = "proto3";
+
+package badgelink;
+
+enum FsActionType {
+  FsActionList = 0;
+  FsActionDelete = 1;
+  FsActionMkdir = 2;
+  FsActionUpload = 3;
+  FsActionDownload = 4;
+  FsActionStat = 5;
+  FsActionCrc23 = 6;
+  FsActionGetUsage = 7;
+  FsActionRmdir = 8;
+}
+
+enum NvsActionType {
+  NvsActionList = 0;
+  NvsActionRead = 1;
+  NvsActionWrite = 2;
+  NvsActionDelete = 3;
+}
+
+enum NvsValueType {
+  NvsValueUint8 = 0;
+  NvsValueInt8 = 1;
+  NvsValueUint16 = 2;
+  NvsValueInt16 = 3;
+  NvsValueUint32 = 4;
+  NvsValueInt32 = 5;
+  NvsValueUint64 = 6;
+  NvsValueInt64 = 7;
+  NvsValueString = 8;
+  NvsValueBlob = 9;
+}
+
+enum StatusCode {
+  StatusOk = 0;
+  StatusNotSupported = 1;
+  StatusNotFound = 2;
+  StatusMalformed = 3;
+  StatusInternalError = 4;
+  StatusIllegalState = 5;
+  StatusNoSpace = 6;
+  StatusNotEmpty = 7;
+  StatusIsFile = 8;
+  StatusIsDir = 9;
+  StatusExists = 10;
+}
+
+enum XferReq {
+  XferContinue = 0;
+  XferAbort = 1;
+  XferFinish = 2;
+}
+
+message AppfsActionReq {
+  oneof id {
+    AppfsMetadata metadata = 2;
+    string slug = 3;
+  }
+
+  FsActionType type = 1;
+  uint32 crc32 = 4;
+  uint32 list_offset = 5;
+}
+
+message AppfsActionResp {
+  oneof val {
+    AppfsMetadata metadata = 1;
+    uint32 crc32 = 2;
+    AppfsList list = 3;
+    FsUsage usage = 4;
+  }
+
+  uint32 size = 5;
+}
+
+message AppfsList {
+  repeated AppfsMetadata list = 1;
+  uint32 total_size = 2;
+}
+
+message AppfsMetadata {
+  string slug = 1;
+  string title = 2;
+  uint32 version = 3;
+  uint32 size = 4;
+}
+
+message Chunk {
+  uint32 position = 2;
+  bytes data = 3;
+}
+
+message FsActionReq {
+  FsActionType type = 1;
+  string path = 2;
+  uint32 crc32 = 3;
+  uint32 list_offset = 4;
+  uint32 size = 5;
+}
+
+message FsActionResp {
+  oneof val {
+    FsStat stat = 1;
+    uint32 crc32 = 2;
+    FsDirentList list = 3;
+    FsUsage usage = 4;
+  }
+
+  uint32 size = 5;
+}
+
+message FsDirent {
+  string name = 1;
+  bool is_dir = 2;
+}
+
+message FsDirentList {
+  repeated FsDirent list = 1;
+  uint32 total_size = 2;
+}
+
+message FsStat {
+  uint32 size = 1;
+  uint64 mtime = 2;
+  uint64 ctime = 3;
+  uint64 atime = 4;
+  bool is_dir = 5;
+}
+
+message FsUsage {
+  uint32 size = 1;
+  uint32 used = 2;
+}
+
+message NvsActionReq {
+  NvsActionType type = 1;
+  string namespc = 2;
+  string key = 3;
+  NvsValue wdata = 4;
+  uint32 list_offset = 5;
+  NvsValueType read_type = 6;
+}
+
+message NvsActionResp {
+  oneof val {
+    NvsValue rdata = 1;
+    NvsEntriesList entries = 2;
+  }
+}
+
+message NvsEntriesList {
+  repeated NvsEntry entries = 1;
+  uint32 total_entries = 2;
+}
+
+message NvsEntry {
+  NvsValueType type = 1;
+  string namespc = 2;
+  string key = 3;
+}
+
+message NvsValue {
+  oneof val {
+    uint64 numericval = 2;
+    string stringval = 3;
+    bytes blobval = 4;
+  }
+
+  NvsValueType type = 1;
+}
+
+message Packet {
+  oneof packet {
+    Request request = 2;
+    Response response = 3;
+    bool sync = 4;
+  }
+
+  uint64 serial = 1;
+}
+
+message Request {
+  oneof req {
+    Chunk upload_chunk = 1;
+    AppfsActionReq appfs_action = 2;
+    FsActionReq fs_action = 3;
+    NvsActionReq nvs_action = 4;
+    StartAppReq start_app = 5;
+    XferReq xfer_ctrl = 6;
+  }
+}
+
+message Response {
+  oneof resp {
+    Chunk download_chunk = 2;
+    AppfsActionResp appfs_resp = 3;
+    FsActionResp fs_resp = 4;
+    NvsActionResp nvs_resp = 5;
+  }
+
+  StatusCode status_code = 1;
+}
+
+message StartAppReq {
+  string slug = 1;
+  string arg = 2;
+}

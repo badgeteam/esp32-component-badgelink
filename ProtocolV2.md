@@ -12,7 +12,7 @@ Sent by the client to negotiate the protocol version.
 
 | Field | Tag | Type | Description |
 |-------|-----|------|-------------|
-| client_version | 1 | uint16 | Highest protocol version supported by the client |
+| client_version | 1 | uint32 | Highest protocol version supported by the client |
 
 #### VersionResp (Response tag 6)
 
@@ -20,8 +20,8 @@ Sent by the server in response to a VersionReq.
 
 | Field | Tag | Type | Description |
 |-------|-----|------|-------------|
-| server_version | 1 | uint16 | Highest protocol version supported by the server |
-| negotiated_version | 2 | uint16 | Protocol version to use for this session |
+| server_version | 1 | uint32 | Highest protocol version supported by the server |
+| negotiated_version | 2 | uint32 | Protocol version to use for this session |
 
 ### Negotiation Algorithm
 
@@ -123,3 +123,24 @@ Use `--version1` when you need to connect using the legacy protocol, for example
 # Force version 1 protocol
 ./badgelink.sh --version1 fs download /sd/file.bin local_file.bin
 ```
+
+---
+
+## Revision History
+
+### 2025-12-16: Field Type Change (uint16 to uint32)
+
+The version fields in `VersionReq` and `VersionResp` were changed from `uint16` to `uint32`.
+
+**Reason**: Protocol Buffers (proto3) does not have a native `uint16` type. The smallest unsigned integer type available is `uint32`. While nanopb can generate C code with `uint16_t` fields using options, this creates inconsistency between the C implementation and other language bindings (Python, etc.) which use `uint32`.
+
+**Changes made**:
+
+| File | Change |
+|------|--------|
+| `badgelink.proto` | Added `VersionReq` and `VersionResp` messages with `uint32` fields |
+| `badgelink.pb.h` | Changed struct fields from `uint16_t` to `uint32_t` |
+| `tools/libraries/badgelink_pb2.py` | Regenerated from updated proto file |
+| `tools/badgelink.py` | Simplified to use generated protobuf classes instead of manual encoding |
+
+**Wire compatibility**: This change is wire-compatible. Protobuf varints encode small values (like version numbers 1, 2, etc.) identically regardless of whether the field is declared as `uint16` or `uint32`. Existing implementations will continue to work.

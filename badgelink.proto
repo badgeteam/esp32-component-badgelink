@@ -190,6 +190,7 @@ message Request {
     NvsActionReq nvs_action = 4;
     StartAppReq start_app = 5;
     XferReq xfer_ctrl = 6;
+    VersionReq version_req = 7;
   }
 }
 
@@ -199,6 +200,7 @@ message Response {
     AppfsActionResp appfs_resp = 3;
     FsActionResp fs_resp = 4;
     NvsActionResp nvs_resp = 5;
+    VersionResp version_resp = 6;
   }
 
   StatusCode status_code = 1;
@@ -207,4 +209,13 @@ message Response {
 message StartAppReq {
   string slug = 1;
   string arg = 2;
+}
+
+message VersionReq {
+  uint32 client_version = 1;
+}
+
+message VersionResp {
+  uint32 server_version = 1;
+  uint32 negotiated_version = 2;
 }

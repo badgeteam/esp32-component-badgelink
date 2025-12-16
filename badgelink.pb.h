@@ -103,15 +103,15 @@ typedef enum _badgelink_NvsValueType {
 /* Protocol version request. */
 typedef struct _badgelink_VersionReq {
     /* Highest protocol version supported by client. */
-    uint16_t client_version;
+    uint32_t client_version;
 } badgelink_VersionReq;
 
 /* Protocol version response. */
 typedef struct _badgelink_VersionResp {
     /* Highest protocol version supported by server. */
-    uint16_t server_version;
+    uint32_t server_version;
     /* Negotiated protocol version (min of client and server). */
-    uint16_t negotiated_version;
+    uint32_t negotiated_version;
 } badgelink_VersionResp;
 
 typedef struct _badgelink_StartAppReq {
@@ -795,6 +795,8 @@ extern const pb_msgdesc_t badgelink_NvsActionResp_msg;
 #define badgelink_Request_size                   4153
 #define badgelink_Response_size                  5134
 #define badgelink_StartAppReq_size               179
+#define badgelink_VersionReq_size                6
+#define badgelink_VersionResp_size               12
 
 #ifdef __cplusplus
 } /* extern "C" */

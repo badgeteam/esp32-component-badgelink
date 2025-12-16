@@ -332,6 +332,8 @@ class BadgelinkConnection:
             request = Request(upload_chunk=request)
         elif type(request) == StartAppReq:
             request = Request(start_app=request)
+        elif type(request) == VersionReq:
+            request = Request(version_req=request)
         elif type(request) != Request:
             raise TypeError("Invalid request type")
         
@@ -397,65 +399,25 @@ class Badgelink:
         Sends a VersionReq and handles the response.
         """
         try:
-            # Build VersionReq manually since it's not in the generated protobuf
-            # Request tag 7, field 1 = client_version (uint16)
-            # We'll send this as a raw request
-            self.conn.serial_no = (self.conn.serial_no + 1) % (1 << 32)
+            resp = self.conn.simple_request(
+                VersionReq(client_version=self.PROTOCOL_VERSION),
+                timeout=self.def_timeout
+            )
 
-            # Create a packet with version request
-            # The version_req is tag 7 in Request oneof
-            # VersionReq has client_version as field 1 (uint32 in protobuf wire format)
-            packet = Packet(serial=self.conn.serial_no)
-            packet.request.SetInParent()
-
-            # Manually encode version request: tag 7, field 1 = PROTOCOL_VERSION
-            # Using protobuf wire format: field 1 varint = client_version
-            version_req_bytes = b'\x08' + bytes([self.PROTOCOL_VERSION])  # field 1, varint
-
-            # Set the raw bytes for the version_req field (tag 7)
-            # This is a workaround since VersionReq isn't in the generated code
-            raw_request = b'\x3a' + bytes([len(version_req_bytes)]) + version_req_bytes  # tag 7, length-delimited
-
-            # Build full packet manually
-            serial_bytes = b'\x08' + self._encode_varint(self.conn.serial_no)  # field 1 = serial
-            request_wrapper = b'\x12' + bytes([len(raw_request)]) + raw_request  # field 2 = request
-
-            full_packet = serial_bytes + request_wrapper
-            self.conn.send_frame(full_packet)
-
-            resp_packet = self.conn.recv_packet(self.def_timeout)
-
-            if resp_packet.response.status_code == StatusCode.StatusNotSupported:
-                # Old server, use protocol version 1
-                self.protocol_version = 1
-                print("Server uses protocol version 1 (legacy)")
-            elif resp_packet.response.status_code == StatusCode.StatusOk:
-                # Parse version response from raw bytes
-                # Response tag 6 = version_resp
-                # VersionResp: field 1 = server_version, field 2 = negotiated_version
-                if resp_packet.response.HasField('fs_resp'):
-                    # Version response comes back as fs_resp due to tag collision workaround
-                    # Actually, we need to check the raw response
-                    pass
-                # For now, if we got StatusOk, assume v2
-                self.protocol_version = 2
-                print(f"Negotiated protocol version {self.protocol_version}")
+            if resp.HasField('version_resp'):
+                self.protocol_version = resp.version_resp.negotiated_version
+                print(f"Negotiated protocol version {self.protocol_version} (server supports v{resp.version_resp.server_version})")
             else:
-                # Unexpected response, fall back to v1
+                # Unexpected response format, fall back to v1
                 self.protocol_version = 1
-        except (TimeoutError, NotSupportedError):
+        except NotSupportedError:
             # Server doesn't support version negotiation, use v1
             self.protocol_version = 1
             print("Server uses protocol version 1 (legacy)")
-
-    def _encode_varint(self, value: int) -> bytes:
-        """Encode an integer as a protobuf varint."""
-        result = []
-        while value > 127:
-            result.append((value & 0x7f) | 0x80)
-            value >>= 7
-        result.append(value)
-        return bytes(result)
+        except TimeoutError:
+            # Server didn't respond, use v1
+            self.protocol_version = 1
+            print("Server uses protocol version 1 (legacy)")
     
     def start_app(self, slug: str, app_arg: str):
         """

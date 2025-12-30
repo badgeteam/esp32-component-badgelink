@@ -18,8 +18,11 @@
 static char const TAG[] = "badgelink_fs";
 
 // Fast SD I/O helpers - use internal DMA RAM for stdio buffers
-#ifdef CONFIG_SD_FAST_IO
-#define BADGELINK_STDIO_BUF_SIZE 8192
+#ifdef CONFIG_FATFS_USE_FASTOPEN
+#ifndef CONFIG_FATFS_STDIO_BUF_SIZE
+#define CONFIG_FATFS_STDIO_BUF_SIZE 8192
+#endif
+#define BADGELINK_STDIO_BUF_SIZE CONFIG_FATFS_STDIO_BUF_SIZE
 
 static FILE*  bl_fast_file   = NULL;
 static void*  bl_fast_buffer = NULL;

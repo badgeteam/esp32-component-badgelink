@@ -18,6 +18,11 @@
 #include "pb_encode.h"
 #include "string.h"
 
+// Default queue size if not configured via sdkconfig
+#ifndef CONFIG_BADGELINK_QUEUE_SIZE
+#define CONFIG_BADGELINK_QUEUE_SIZE 256
+#endif
+
 // Set to 1 to see raw bytes before/after COBS encoding/decoding.
 #ifndef DUMP_RAW_BYTES
 #define DUMP_RAW_BYTES 0
@@ -63,7 +68,7 @@ static void          badgelink_thread_main(void*);
 
 // Prepare the data for the BadgeLink service to start.
 void badgelink_init() {
-    rxqueue = xQueueCreate(256, sizeof(fragment_t));
+    rxqueue = xQueueCreate(CONFIG_BADGELINK_QUEUE_SIZE, sizeof(fragment_t));
 }
 
 // Start the badgelink service.

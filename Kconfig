@@ -1,0 +1,12 @@
+menu "BadgeLink"
+
+    config BADGELINK_QUEUE_SIZE
+        int "RX queue size (number of fragments)"
+        default 256
+        range 16 1024
+        help
+            Size of the receive queue for BadgeLink fragments.
+            Each fragment is 32 bytes. Larger values use more memory
+            but can handle higher throughput.
+
+endmenu

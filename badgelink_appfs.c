@@ -13,6 +13,8 @@ static char const TAG[] = "badgelink_appfs";
 static appfs_handle_t xfer_fd;
 // CRC32 of file transferred.
 static uint32_t       xfer_crc32;
+// Running CRC32 computed during upload.
+static uint32_t       running_crc;
 
 // Calculate the CRC32 of an AppFS file.
 static uint32_t calc_app_crc32(appfs_handle_t fd) {
@@ -69,6 +71,7 @@ void badgelink_appfs_xfer_upload() {
         ESP_LOGE(TAG, "%s: error %s", __FUNCTION__, esp_err_to_name(ec));
         badgelink_status_int_err();
     } else {
+        running_crc = esp_crc32_le(running_crc, chunk->data.bytes, chunk->data.size);
         badgelink_status_ok();
     }
 }
@@ -90,6 +93,10 @@ void badgelink_appfs_xfer_download() {
         ESP_LOGE(TAG, "%s: error %s", __FUNCTION__, esp_err_to_name(ec));
         badgelink_status_int_err();
     } else {
+        // For protocol version 2+, compute streaming CRC during download.
+        if (badgelink_get_protocol_version() >= 2) {
+            running_crc = esp_crc32_le(running_crc, chunk->data.bytes, chunk->data.size);
+        }
         badgelink_send_packet();
     }
 }
@@ -108,10 +115,9 @@ void badgelink_appfs_xfer_stop(bool abnormal) {
             appfsDeleteFile(name);
 
         } else {
-            uint32_t actual_crc32 = calc_app_crc32(xfer_fd);
-            if (actual_crc32 != xfer_crc32) {
+            if (running_crc != xfer_crc32) {
                 ESP_LOGE(TAG, "AppFS upload CRC32 mismatch; expected %08" PRIx32 ", actual %08" PRIx32, xfer_crc32,
-                         actual_crc32);
+                         running_crc);
                 badgelink_status_int_err();
 
                 // AppFS can delete by fd so this is the workaround.
@@ -130,6 +136,20 @@ void badgelink_appfs_xfer_stop(bool abnormal) {
             ESP_LOGE(TAG, "AppFS download aborted");
         } else {
             ESP_LOGI(TAG, "AppFS download finished");
+
+            // For protocol version 2+, send the final CRC.
+            if (badgelink_get_protocol_version() >= 2) {
+                badgelink_packet.which_packet                = badgelink_Packet_response_tag;
+                badgelink_packet.packet.response.status_code = badgelink_StatusCode_StatusOk;
+                badgelink_packet.packet.response.which_resp  = badgelink_Response_appfs_resp_tag;
+                badgelink_AppfsActionResp* resp              = &badgelink_packet.packet.response.resp.appfs_resp;
+                resp->which_val                              = badgelink_AppfsActionResp_crc32_tag;
+                resp->val.crc32                              = running_crc;
+                resp->size                                   = badgelink_xfer_size;
+                badgelink_send_packet();
+            } else {
+                badgelink_status_ok();
+            }
         }
     }
 }
@@ -251,6 +271,7 @@ void badgelink_appfs_upload() {
     badgelink_xfer_pos       = 0;
     badgelink_xfer_size      = req->id.metadata.size;
     xfer_crc32               = req->crc32;
+    running_crc              = 0;
 
     // This OK response officially starts the transfer.
     ESP_LOGI(TAG, "AppFS upload started");
@@ -276,10 +297,17 @@ void badgelink_appfs_download() {
         return;
     }
 
-    // Calculate file CRC32 and get size.
-    uint32_t crc = calc_app_crc32(fd);
+    uint32_t crc = 0;
     int      size;
     appfsEntryInfo(fd, NULL, &size);
+
+    if (badgelink_get_protocol_version() >= 2) {
+        // Protocol version 2+: CRC will be computed during transfer.
+        running_crc = 0;
+    } else {
+        // Protocol version 1: calculate CRC32 upfront by reading entire file.
+        crc = calc_app_crc32(fd);
+    }
 
     // Set up transfer.
     badgelink_xfer_type      = BADGELINK_XFER_APPFS;

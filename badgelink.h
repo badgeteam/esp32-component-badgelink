@@ -17,3 +17,6 @@ void badgelink_start(usb_callback_t usb_callback);
 
 // Handle received data.
 void badgelink_rxdata_cb(uint8_t const* data, size_t len);
+
+// Get the negotiated protocol version.
+uint16_t badgelink_get_protocol_version();

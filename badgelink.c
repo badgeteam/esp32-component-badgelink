@@ -18,6 +18,11 @@
 #include "pb_encode.h"
 #include "string.h"
 
+// Default queue size if not configured via sdkconfig
+#ifndef CONFIG_BADGELINK_QUEUE_SIZE
+#define CONFIG_BADGELINK_QUEUE_SIZE 256
+#endif
+
 // Set to 1 to see raw bytes before/after COBS encoding/decoding.
 #ifndef DUMP_RAW_BYTES
 #define DUMP_RAW_BYTES 0
@@ -49,6 +54,11 @@ static uint32_t next_serial = 0;
 // Frame refers here to the networking term, not the computer graphics term.
 static uint8_t  frame_buffer[BADGELINK_BUF_CAP];
 
+// Protocol version constants.
+#define BADGELINK_PROTOCOL_VERSION 2
+// Negotiated protocol version (defaults to 1 for backwards compatibility).
+static uint16_t negotiated_version = 1;
+
 // Queue that sends received data over to the BadgeLink thread.
 static QueueHandle_t rxqueue;
 // Handle to the BadgeLink thread.
@@ -58,7 +68,7 @@ static void          badgelink_thread_main(void*);
 
 // Prepare the data for the BadgeLink service to start.
 void badgelink_init() {
-    rxqueue = xQueueCreate(16, sizeof(fragment_t));
+    rxqueue = xQueueCreate(CONFIG_BADGELINK_QUEUE_SIZE, sizeof(fragment_t));
 }
 
 // Start the badgelink service.
@@ -125,6 +135,32 @@ void badgelink_send_status(badgelink_StatusCode code) {
     badgelink_packet.which_packet                = badgelink_Packet_response_tag;
     badgelink_packet.packet.response.which_resp  = 0;
     badgelink_packet.packet.response.status_code = code;
+    badgelink_send_packet();
+}
+
+// Get the negotiated protocol version.
+uint16_t badgelink_get_protocol_version() {
+    return negotiated_version;
+}
+
+// Handle a version negotiation request.
+static void handle_version_req() {
+    badgelink_VersionReq* req = &badgelink_packet.packet.request.req.version_req;
+    uint16_t client_version   = req->client_version;
+
+    // Negotiate: use the lower of client and server versions.
+    uint16_t negotiated = client_version < BADGELINK_PROTOCOL_VERSION ? client_version : BADGELINK_PROTOCOL_VERSION;
+    negotiated_version  = negotiated;
+
+    ESP_LOGI(TAG, "Version negotiation: client=%u, server=%u, negotiated=%u", client_version,
+             BADGELINK_PROTOCOL_VERSION, negotiated);
+
+    // Send response with server version and negotiated version.
+    badgelink_packet.which_packet                                        = badgelink_Packet_response_tag;
+    badgelink_packet.packet.response.status_code                         = badgelink_StatusCode_StatusOk;
+    badgelink_packet.packet.response.which_resp                          = badgelink_Response_version_resp_tag;
+    badgelink_packet.packet.response.resp.version_resp.server_version    = BADGELINK_PROTOCOL_VERSION;
+    badgelink_packet.packet.response.resp.version_resp.negotiated_version = negotiated;
     badgelink_send_packet();
 }
 
@@ -237,7 +273,9 @@ static void handle_packet() {
             return;
         }
         // Sync packet received; set next expected serial number and respond with the same sync packet.
-        next_serial = badgelink_packet.serial + 1;
+        // Reset negotiated version to 1 for new connections.
+        next_serial        = badgelink_packet.serial + 1;
+        negotiated_version = 1;
         badgelink_send_packet();
         return;
     } else if (badgelink_packet.which_packet != badgelink_Packet_request_tag) {
@@ -290,6 +328,9 @@ static void handle_packet() {
             break;
         case badgelink_Request_fs_action_tag:
             badgelink_fs_handle();
+            break;
+        case badgelink_Request_version_req_tag:
+            handle_version_req();
             break;
         default:
             badgelink_status_unsupported();

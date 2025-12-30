@@ -100,6 +100,20 @@ typedef enum _badgelink_NvsValueType {
 } badgelink_NvsValueType;
 
 /* Struct definitions */
+/* Protocol version request. */
+typedef struct _badgelink_VersionReq {
+    /* Highest protocol version supported by client. */
+    uint32_t client_version;
+} badgelink_VersionReq;
+
+/* Protocol version response. */
+typedef struct _badgelink_VersionResp {
+    /* Highest protocol version supported by server. */
+    uint32_t server_version;
+    /* Negotiated protocol version (min of client and server). */
+    uint32_t negotiated_version;
+} badgelink_VersionResp;
+
 typedef struct _badgelink_StartAppReq {
     /* App slug. */
     char slug[48];
@@ -287,6 +301,8 @@ typedef struct _badgelink_Request {
         badgelink_StartAppReq start_app;
         /* Transfer control request. */
         badgelink_XferReq xfer_ctrl;
+        /* Protocol version request. */
+        badgelink_VersionReq version_req;
     } req;
 } badgelink_Request;
 
@@ -321,6 +337,8 @@ typedef struct _badgelink_Response {
         badgelink_FsActionResp fs_resp;
         /* NVS action response. */
         badgelink_NvsActionResp nvs_resp;
+        /* Protocol version response. */
+        badgelink_VersionResp version_resp;
     } resp;
 } badgelink_Response;
 
@@ -496,6 +514,10 @@ extern "C" {
 #define badgelink_Request_nvs_action_tag         4
 #define badgelink_Request_start_app_tag          5
 #define badgelink_Request_xfer_ctrl_tag          6
+#define badgelink_Request_version_req_tag        7
+#define badgelink_VersionReq_client_version_tag  1
+#define badgelink_VersionResp_server_version_tag 1
+#define badgelink_VersionResp_negotiated_version_tag 2
 #define badgelink_NvsEntriesList_entries_tag     1
 #define badgelink_NvsEntriesList_total_entries_tag 2
 #define badgelink_NvsActionResp_rdata_tag        1
@@ -505,6 +527,7 @@ extern "C" {
 #define badgelink_Response_appfs_resp_tag        3
 #define badgelink_Response_fs_resp_tag           4
 #define badgelink_Response_nvs_resp_tag          5
+#define badgelink_Response_version_resp_tag      6
 #define badgelink_Packet_serial_tag              1
 #define badgelink_Packet_request_tag             2
 #define badgelink_Packet_response_tag            3
@@ -527,7 +550,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (req,appfs_action,req.appfs_action),   2) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (req,fs_action,req.fs_action),   3) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (req,nvs_action,req.nvs_action),   4) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (req,start_app,req.start_app),   5) \
-X(a, STATIC,   ONEOF,    UENUM,    (req,xfer_ctrl,req.xfer_ctrl),   6)
+X(a, STATIC,   ONEOF,    UENUM,    (req,xfer_ctrl,req.xfer_ctrl),   6) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (req,version_req,req.version_req),   7)
 #define badgelink_Request_CALLBACK NULL
 #define badgelink_Request_DEFAULT NULL
 #define badgelink_Request_req_upload_chunk_MSGTYPE badgelink_Chunk
@@ -535,19 +559,33 @@ X(a, STATIC,   ONEOF,    UENUM,    (req,xfer_ctrl,req.xfer_ctrl),   6)
 #define badgelink_Request_req_fs_action_MSGTYPE badgelink_FsActionReq
 #define badgelink_Request_req_nvs_action_MSGTYPE badgelink_NvsActionReq
 #define badgelink_Request_req_start_app_MSGTYPE badgelink_StartAppReq
+#define badgelink_Request_req_version_req_MSGTYPE badgelink_VersionReq
 
 #define badgelink_Response_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UENUM,    status_code,       1) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (resp,download_chunk,resp.download_chunk),   2) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (resp,appfs_resp,resp.appfs_resp),   3) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (resp,fs_resp,resp.fs_resp),   4) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (resp,nvs_resp,resp.nvs_resp),   5)
+X(a, STATIC,   ONEOF,    MESSAGE,  (resp,nvs_resp,resp.nvs_resp),   5) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (resp,version_resp,resp.version_resp),   6)
 #define badgelink_Response_CALLBACK NULL
 #define badgelink_Response_DEFAULT NULL
 #define badgelink_Response_resp_download_chunk_MSGTYPE badgelink_Chunk
 #define badgelink_Response_resp_appfs_resp_MSGTYPE badgelink_AppfsActionResp
 #define badgelink_Response_resp_fs_resp_MSGTYPE badgelink_FsActionResp
 #define badgelink_Response_resp_nvs_resp_MSGTYPE badgelink_NvsActionResp
+#define badgelink_Response_resp_version_resp_MSGTYPE badgelink_VersionResp
+
+#define badgelink_VersionReq_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   client_version,    1)
+#define badgelink_VersionReq_CALLBACK NULL
+#define badgelink_VersionReq_DEFAULT NULL
+
+#define badgelink_VersionResp_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UINT32,   server_version,    1) \
+X(a, STATIC,   SINGULAR, UINT32,   negotiated_version, 2)
+#define badgelink_VersionResp_CALLBACK NULL
+#define badgelink_VersionResp_DEFAULT NULL
 
 #define badgelink_StartAppReq_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, STRING,   slug,              1) \
@@ -692,6 +730,8 @@ extern const pb_msgdesc_t badgelink_Packet_msg;
 extern const pb_msgdesc_t badgelink_Request_msg;
 extern const pb_msgdesc_t badgelink_Response_msg;
 extern const pb_msgdesc_t badgelink_StartAppReq_msg;
+extern const pb_msgdesc_t badgelink_VersionReq_msg;
+extern const pb_msgdesc_t badgelink_VersionResp_msg;
 extern const pb_msgdesc_t badgelink_Chunk_msg;
 extern const pb_msgdesc_t badgelink_FsUsage_msg;
 extern const pb_msgdesc_t badgelink_AppfsMetadata_msg;
@@ -714,6 +754,8 @@ extern const pb_msgdesc_t badgelink_NvsActionResp_msg;
 #define badgelink_Request_fields &badgelink_Request_msg
 #define badgelink_Response_fields &badgelink_Response_msg
 #define badgelink_StartAppReq_fields &badgelink_StartAppReq_msg
+#define badgelink_VersionReq_fields &badgelink_VersionReq_msg
+#define badgelink_VersionResp_fields &badgelink_VersionResp_msg
 #define badgelink_Chunk_fields &badgelink_Chunk_msg
 #define badgelink_FsUsage_fields &badgelink_FsUsage_msg
 #define badgelink_AppfsMetadata_fields &badgelink_AppfsMetadata_msg
@@ -753,6 +795,8 @@ extern const pb_msgdesc_t badgelink_NvsActionResp_msg;
 #define badgelink_Request_size                   4153
 #define badgelink_Response_size                  5134
 #define badgelink_StartAppReq_size               179
+#define badgelink_VersionReq_size                6
+#define badgelink_VersionResp_size               12
 
 #ifdef __cplusplus
 } /* extern "C" */

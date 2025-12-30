@@ -332,6 +332,8 @@ class BadgelinkConnection:
             request = Request(upload_chunk=request)
         elif type(request) == StartAppReq:
             request = Request(start_app=request)
+        elif type(request) == VersionReq:
+            request = Request(version_req=request)
         elif type(request) != Request:
             raise TypeError("Invalid request type")
         
@@ -377,14 +379,45 @@ class BadgelinkConnection:
 
 class Badgelink:
     CHUNK_MAX_SIZE = 4096
-    
-    def __init__(self, conn: BadgelinkConnection|BadgeUSB|Serial):
+    PROTOCOL_VERSION = 2
+
+    def __init__(self, conn: BadgelinkConnection|BadgeUSB|Serial, force_version1: bool = False):
         if type(conn) != BadgelinkConnection:
             conn = BadgelinkConnection(conn)
         self.conn = conn
         self.def_timeout = 0.25
         self.chunk_timeout = 0.5
         self.xfer_timeout = 10
+        self.protocol_version = 1  # Default to v1 for backwards compatibility
+
+        if not force_version1:
+            self._negotiate_version()
+
+    def _negotiate_version(self):
+        """
+        Negotiate protocol version with the badge.
+        Sends a VersionReq and handles the response.
+        """
+        try:
+            resp = self.conn.simple_request(
+                VersionReq(client_version=self.PROTOCOL_VERSION),
+                timeout=self.def_timeout
+            )
+
+            if resp.HasField('version_resp'):
+                self.protocol_version = resp.version_resp.negotiated_version
+                print(f"Negotiated protocol version {self.protocol_version} (server supports v{resp.version_resp.server_version})")
+            else:
+                # Unexpected response format, fall back to v1
+                self.protocol_version = 1
+        except NotSupportedError:
+            # Server doesn't support version negotiation, use v1
+            self.protocol_version = 1
+            print("Server uses protocol version 1 (legacy)")
+        except TimeoutError:
+            # Server didn't respond, use v1
+            self.protocol_version = 1
+            print("Server uses protocol version 1 (legacy)")
     
     def start_app(self, slug: str, app_arg: str):
         """
@@ -538,11 +571,16 @@ class Badgelink:
         with open(path, "wb") as fd:
             # Send initial request.
             meta = self.conn.simple_request(AppfsActionReq(type=FsActionDownload, slug=slug), timeout=self.xfer_timeout).appfs_resp
-            
+
+            # For v1: crc32 is provided upfront
+            # For v2: crc32 is 0, will be provided at the end
+            expected_crc = meta.crc32 if self.protocol_version == 1 else None
+
             # Initial request succeeded; receive remainder of transfer.
             fd.seek(0, os.SEEK_SET)
             progress = -1
             pos = 0
+            running_crc = 0
             while pos < meta.size:
                 assert pos == fd.tell()
                 if pos * 100 // meta.size > progress:
@@ -554,11 +592,23 @@ class Badgelink:
                     print()
                     raise MalformedResponseError("Incorrect chunk position")
                 fd.write(chunk.data)
+                running_crc = crc32(chunk.data, running_crc)
                 pos += len(chunk.data)
             print()
-            
+
             # Finalize the transfer.
-            self.conn.simple_request(Request(xfer_ctrl=XferFinish), timeout=self.def_timeout)
+            finish_resp = self.conn.simple_request(Request(xfer_ctrl=XferFinish), timeout=self.def_timeout)
+
+            # For v2, the server sends appfs_resp with crc32 at the end
+            if self.protocol_version >= 2 and finish_resp.HasField('appfs_resp'):
+                expected_crc = finish_resp.appfs_resp.crc32
+
+            # Verify CRC
+            if expected_crc is not None:
+                if (running_crc & 0xffffffff) != (expected_crc & 0xffffffff):
+                    print(f"CRC32 mismatch! Expected 0x{expected_crc:08x}, got 0x{running_crc & 0xffffffff:08x}")
+                    raise CommunicationError("CRC32 mismatch")
+
             print("Done!")
     
     def appfs_usage(self) -> FsUsage:
@@ -647,11 +697,16 @@ class Badgelink:
         with open(host_path, "wb") as fd:
             # Send initial request.
             meta = self.conn.simple_request(FsActionReq(type=FsActionDownload, path=badge_path), timeout=self.xfer_timeout).fs_resp
-            
+
+            # For v1: crc32 is provided upfront
+            # For v2: crc32 is 0, will be provided at the end
+            expected_crc = meta.crc32 if self.protocol_version == 1 else None
+
             # Initial request succeeded; receive remainder of transfer.
             fd.seek(0, os.SEEK_SET)
             progress = -1
             pos = 0
+            running_crc = 0
             while pos < meta.size:
                 assert pos == fd.tell()
                 if pos * 100 // meta.size > progress:
@@ -663,11 +718,23 @@ class Badgelink:
                     print()
                     raise MalformedResponseError("Incorrect chunk position")
                 fd.write(chunk.data)
+                running_crc = crc32(chunk.data, running_crc)
                 pos += len(chunk.data)
             print()
-            
+
             # Finalize the transfer.
-            self.conn.simple_request(Request(xfer_ctrl=XferFinish), timeout=self.xfer_timeout)
+            finish_resp = self.conn.simple_request(Request(xfer_ctrl=XferFinish), timeout=self.xfer_timeout)
+
+            # For v2, the server sends fs_resp with crc32 at the end
+            if self.protocol_version >= 2 and finish_resp.HasField('fs_resp'):
+                expected_crc = finish_resp.fs_resp.crc32
+
+            # Verify CRC
+            if expected_crc is not None:
+                if (running_crc & 0xffffffff) != (expected_crc & 0xffffffff):
+                    print(f"CRC32 mismatch! Expected 0x{expected_crc:08x}, got 0x{running_crc & 0xffffffff:08x}")
+                    raise CommunicationError("CRC32 mismatch")
+
             print("Done!")
     
     def fs_mkdir(self, path: str):
@@ -830,6 +897,8 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", action="store", default=0.25, type=float)
     parser.add_argument("--chunk-timeout", action="store", default=0.5, type=float)
     parser.add_argument("--xfer-timeout", action="store", default=10, type=float)
+    parser.add_argument("--version1", action="store_true", default=False,
+                        help="Force protocol version 1 (legacy mode, skip version negotiation)")
     subparsers = parser.add_subparsers(required=True, dest="request")
     
     # ==== Help texts ==== #
@@ -999,7 +1068,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     try:
-        link = Badgelink(port)
+        link = Badgelink(port, force_version1=args.version1)
         link.conn.dump_raw = args.dump_raw_bytes
         link.def_timeout = args.timeout
         link.chunk_timeout = args.chunk_timeout

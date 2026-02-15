@@ -4,7 +4,6 @@ set -e
 set -u
 
 script_dir=$(dirname $(realpath $0))
-echo $script_dir
 
 # Install the virtual environment if it does not exist
 if [[ ! -d "$script_dir/.venv" ]]; then

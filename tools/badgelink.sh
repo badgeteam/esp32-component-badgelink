@@ -3,13 +3,18 @@
 set -e
 set -u
 
+script_dir=$(dirname $(realpath $0))
+echo $script_dir
+
 # Install the virtual environment if it does not exist
-if [[ ! -d ".venv" ]]; then
-./install.sh
+if [[ ! -d "$script_dir/.venv" ]]; then
+    pushd $script_dir
+    ./install.sh
+    popd
 fi
 
 # Activate the virtual environment
-source .venv/bin/activate
+source $script_dir/.venv/bin/activate
 
 # Run BadgeLink
-python badgelink.py "$@"
+python $script_dir/badgelink.py "$@"

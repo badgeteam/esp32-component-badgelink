@@ -824,7 +824,7 @@ if __name__ == "__main__":
             if file:
                 try:
                     fd = open(value, "rb")
-                    val = NvsValueBlob(type=NvsValueBlob, blobval=fd.read())
+                    val = NvsValue(type=NvsValueBlob, blobval=fd.read())
                     fd.close()
                     return val
                 except FileNotFoundError as e:

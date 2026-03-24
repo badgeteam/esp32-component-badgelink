@@ -379,7 +379,7 @@ class BadgelinkConnection:
 
 class Badgelink:
     CHUNK_MAX_SIZE = 4096
-    PROTOCOL_VERSION = 2
+    PROTOCOL_VERSION = 3
 
     def __init__(self, conn: BadgelinkConnection|BadgeUSB|Serial, force_version1: bool = False):
         if type(conn) != BadgelinkConnection:
@@ -749,6 +749,18 @@ class Badgelink:
         """
         self.conn.simple_request(FsActionReq(type=FsActionRmdir, path=path), timeout=self.def_timeout)
 
+    def fs_copy(self, source: str, dest: str):
+        """
+        Copy a file on the badge.
+        """
+        self.conn.simple_request(FsActionReq(type=FsActionCopy, path=source, dest_path=dest), timeout=self.xfer_timeout)
+
+    def fs_rename(self, source: str, dest: str):
+        """
+        Move/rename a file on the badge.
+        """
+        self.conn.simple_request(FsActionReq(type=FsActionRename, path=source, dest_path=dest), timeout=self.xfer_timeout)
+
 
 if __name__ == "__main__":
     def todo():
@@ -948,6 +960,8 @@ if __name__ == "__main__":
             help_fs_upload      = "Upload a file to the badge"
             help_fs_download    = "Download a file from the badge"
             help_fs_usage       = "Show filesystem usage statistics"
+            help_fs_cp          = "Copy a file on the badge"
+            help_fs_mv          = "Move/rename a file on the badge"
     
     # ==== Start app parser ==== #
     if 1:
@@ -1039,7 +1053,15 @@ if __name__ == "__main__":
         p_fs_download.add_argument("host_file", help=help_host_file)
         
         # p_fs_usage = sub_fs.add_parser("usage", help=help_fs_usage)
-    
+
+        p_fs_cp = sub_fs.add_parser("cp", help=help_fs_cp)
+        p_fs_cp.add_argument("source", type=fs_path, help="Source file path on badge")
+        p_fs_cp.add_argument("dest", type=fs_path, help="Destination file path on badge")
+
+        p_fs_mv = sub_fs.add_parser("mv", help=help_fs_mv)
+        p_fs_mv.add_argument("source", type=fs_path, help="Source file path on badge")
+        p_fs_mv.add_argument("dest", type=fs_path, help="Destination file path on badge")
+
     # ==== Implementations ==== #
     args = parser.parse_args()
     
@@ -1172,7 +1194,13 @@ if __name__ == "__main__":
             
             elif args.action == "usage":
                 todo()
-            
+
+            elif args.action == "cp":
+                link.fs_copy(args.source, args.dest)
+
+            elif args.action == "mv":
+                link.fs_rename(args.source, args.dest)
+
             else:
                 todo()
         

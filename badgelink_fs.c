@@ -101,6 +101,12 @@ void badgelink_fs_handle() {
         case badgelink_FsActionType_FsActionRmdir:
             badgelink_fs_rmdir();
             break;
+        case badgelink_FsActionType_FsActionCopy:
+            badgelink_fs_copy();
+            break;
+        case badgelink_FsActionType_FsActionRename:
+            badgelink_fs_rename();
+            break;
         default:
             badgelink_status_unsupported();
             break;
@@ -460,5 +466,143 @@ void badgelink_fs_rmdir() {
         }
     } else {
         badgelink_status_ok();
+    }
+}
+
+// Copy a file from src_path to dst_path on the device.
+// Returns a StatusCode indicating success or failure.
+static badgelink_StatusCode fs_copy_file(char const* src_path, char const* dst_path) {
+    // Open source for reading; use fast I/O if on SD.
+    bool  src_is_sd = (strncmp(src_path, "/sd", 3) == 0);
+    FILE* src       = src_is_sd ? bl_sd_fopen(src_path, "rb") : fopen(src_path, "rb");
+    if (!src) {
+        if (errno == ENOENT) return badgelink_StatusCode_StatusNotFound;
+        if (errno == EISDIR) return badgelink_StatusCode_StatusIsDir;
+        return badgelink_StatusCode_StatusInternalError;
+    }
+
+    // Open destination for writing; use regular fopen because fastopen can only track one file.
+    FILE* dst = fopen(dst_path, "w+b");
+    if (!dst) {
+        badgelink_StatusCode code;
+        if (errno == ENOENT) {
+            code = badgelink_StatusCode_StatusNotFound;
+        } else if (errno == ENOSPC) {
+            code = badgelink_StatusCode_StatusNoSpace;
+        } else {
+            code = badgelink_StatusCode_StatusInternalError;
+        }
+        if (src_is_sd) bl_sd_fclose(src);
+        else fclose(src);
+        return code;
+    }
+
+    // Copy in chunks.
+    uint8_t buf[4096];
+    size_t  n;
+    bool    error = false;
+    while ((n = fread(buf, 1, sizeof(buf), src)) > 0) {
+        if (fwrite(buf, 1, n, dst) < n) {
+            error = true;
+            break;
+        }
+    }
+    if (ferror(src)) error = true;
+
+    // Close both files.
+    if (src_is_sd) bl_sd_fclose(src);
+    else fclose(src);
+    fclose(dst);
+
+    if (error) {
+        unlink(dst_path);
+        return badgelink_StatusCode_StatusInternalError;
+    }
+    return badgelink_StatusCode_StatusOk;
+}
+
+// Handle a FS copy request.
+void badgelink_fs_copy() {
+    badgelink_FsActionReq* req = &badgelink_packet.packet.request.req.fs_action;
+
+    if (req->path[0] == '\0' || req->dest_path[0] == '\0') {
+        badgelink_status_malformed();
+        return;
+    }
+
+    // Check source exists and is a file.
+    struct stat src_stat;
+    if (stat(req->path, &src_stat)) {
+        if (errno == ENOENT) badgelink_status_not_found();
+        else badgelink_status_int_err();
+        return;
+    }
+    if (S_ISDIR(src_stat.st_mode)) {
+        badgelink_status_is_dir();
+        return;
+    }
+
+    // Check destination does not already exist.
+    struct stat dst_stat;
+    if (stat(req->dest_path, &dst_stat) == 0) {
+        badgelink_status_exists();
+        return;
+    }
+
+    badgelink_StatusCode code = fs_copy_file(req->path, req->dest_path);
+    badgelink_send_status(code);
+}
+
+// Handle a FS rename request.
+void badgelink_fs_rename() {
+    badgelink_FsActionReq* req = &badgelink_packet.packet.request.req.fs_action;
+
+    if (req->path[0] == '\0' || req->dest_path[0] == '\0') {
+        badgelink_status_malformed();
+        return;
+    }
+
+    // Try rename() first; works instantly for same-filesystem.
+    if (rename(req->path, req->dest_path) == 0) {
+        badgelink_status_ok();
+        return;
+    }
+
+    if (errno == EXDEV) {
+        // Cross-device: only supported for files, not directories.
+        struct stat src_stat;
+        if (stat(req->path, &src_stat)) {
+            if (errno == ENOENT) badgelink_status_not_found();
+            else badgelink_status_int_err();
+            return;
+        }
+        if (S_ISDIR(src_stat.st_mode)) {
+            badgelink_status_is_dir();
+            return;
+        }
+
+        // Copy file, then delete source.
+        badgelink_StatusCode code = fs_copy_file(req->path, req->dest_path);
+        if (code != badgelink_StatusCode_StatusOk) {
+            badgelink_send_status(code);
+            return;
+        }
+        if (unlink(req->path)) {
+            ESP_LOGE(TAG, "%s: unlink after cross-device copy failed, errno %d", __FUNCTION__, errno);
+            badgelink_status_int_err();
+            return;
+        }
+        badgelink_status_ok();
+    } else if (errno == ENOENT) {
+        badgelink_status_not_found();
+    } else if (errno == EEXIST || errno == ENOTEMPTY) {
+        badgelink_status_exists();
+    } else if (errno == EISDIR) {
+        badgelink_status_is_dir();
+    } else if (errno == ENOSPC) {
+        badgelink_status_no_space();
+    } else {
+        ESP_LOGE(TAG, "%s: Unknown errno %d", __FUNCTION__, errno);
+        badgelink_status_int_err();
     }
 }

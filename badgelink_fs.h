@@ -33,3 +33,7 @@ void badgelink_fs_crc32();
 void badgelink_fs_usage();
 // Handle a FS rmdir request.
 void badgelink_fs_rmdir();
+// Handle a FS copy request.
+void badgelink_fs_copy();
+// Handle a FS rename request.
+void badgelink_fs_rename();

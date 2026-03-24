@@ -55,7 +55,7 @@ static uint32_t next_serial = 0;
 static uint8_t  frame_buffer[BADGELINK_BUF_CAP];
 
 // Protocol version constants.
-#define BADGELINK_PROTOCOL_VERSION 2
+#define BADGELINK_PROTOCOL_VERSION 3
 // Negotiated protocol version (defaults to 1 for backwards compatibility).
 static uint16_t negotiated_version = 1;
 

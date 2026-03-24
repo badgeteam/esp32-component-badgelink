@@ -6,6 +6,7 @@ import time
 import os
 import sys
 import random
+import socket
 from serial import Serial, SerialException
 from cobs import cobs
 from zlib import crc32
@@ -164,7 +165,7 @@ class DualPipeConnection:
     def __init__(self, infd: BinaryIO, outfd: BinaryIO):
         self.infd  = infd
         self.outfd = outfd
-    
+
     def flush(self):
         self.outfd.flush()
 
@@ -175,12 +176,38 @@ class DualPipeConnection:
         return self.infd.read()
 
 
+class TCPConnection:
+    def __init__(self, host: str, port: int):
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.connect((host, port))
+        self.sock.setsockopt(socket.IPPROTO_TCP, socket.TCP_NODELAY, 1)
+        self.sock.setblocking(False)
+
+    def flush(self):
+        pass
+
+    def write(self, data: bytes):
+        self.sock.sendall(data)
+
+    def read_all(self) -> bytes:
+        data = b''
+        while True:
+            try:
+                chunk = self.sock.recv(32)
+                if not chunk:
+                    break
+                data += chunk
+            except BlockingIOError:
+                break
+        return data
+
+
 class BadgelinkConnection:
     """
     Helper class that deals with sending and receiving packets over Badgelink.
     """
-    
-    def __init__(self, conn: Serial|BadgeUSB|DualPipeConnection):
+
+    def __init__(self, conn: Serial|BadgeUSB|DualPipeConnection|TCPConnection):
         # Underlying serial bus connection.
         self.conn       = conn
         # Received data buffer.
@@ -909,6 +936,8 @@ if __name__ == "__main__":
     parser.add_argument("--timeout", action="store", default=0.25, type=float)
     parser.add_argument("--chunk-timeout", action="store", default=0.5, type=float)
     parser.add_argument("--xfer-timeout", action="store", default=10, type=float)
+    parser.add_argument("--tcp", action="store", default=None, metavar="HOST:PORT",
+                        help="Connect via TCP proxy instead of USB (e.g., localhost:4002)")
     parser.add_argument("--version1", action="store_true", default=False,
                         help="Force protocol version 1 (legacy mode, skip version negotiation)")
     subparsers = parser.add_subparsers(required=True, dest="request")
@@ -1065,19 +1094,23 @@ if __name__ == "__main__":
     # ==== Implementations ==== #
     args = parser.parse_args()
     
-    if args.port != None and (args.inpipe != None or args.outpipe != None):
-        print(f"{sys.argv[0]}: error: --port is mutually exclusive with --inpipe, --outpipe")
+    conn_opts = sum(x is not None for x in [args.port, args.tcp, args.inpipe])
+    if conn_opts > 1:
+        print(f"{sys.argv[0]}: error: --port, --tcp, and --inpipe/--outpipe are mutually exclusive")
         sys.exit(1)
-    elif args.inpipe != None and args.outpipe == None:
+    if args.inpipe != None and args.outpipe == None:
         print(f"{sys.argv[0]}: error: --inpipe without --outpipe")
         sys.exit(1)
     elif args.outpipe != None and args.inpipe == None:
         print(f"{sys.argv[0]}: error: --outpipe without --inpipe")
         sys.exit(1)
-    
+
     try:
         if args.port:
             port = Serial(port=args.port, baudrate=115200)
+        elif args.tcp:
+            tcp_host, tcp_port = args.tcp.rsplit(':', 1)
+            port = TCPConnection(tcp_host, int(tcp_port))
         elif args.inpipe:
             infd = open(args.inpipe, "rb")
             outfd = open(args.outpipe, "wb")
@@ -1087,6 +1120,9 @@ if __name__ == "__main__":
             port = BadgeUSB()
     except FileNotFoundError:
         print("Badge not found. Make sure that your badge is connected, powered on and in USB mode. To place your badge in USB mode, go to the launcher home screen and press the purple diamond. Verify that a USB icon is shown in the top right, next to the battery")
+        sys.exit(1)
+    except (ConnectionRefusedError, OSError) as e:
+        print(f"Failed to connect to TCP proxy: {e}")
         sys.exit(1)
     
     try:

@@ -62,7 +62,11 @@ typedef enum _badgelink_FsActionType {
     /* Get space usage of filesystem. */
     badgelink_FsActionType_FsActionGetUsage = 7,
     /* Remove directory. */
-    badgelink_FsActionType_FsActionRmdir = 8
+    badgelink_FsActionType_FsActionRmdir = 8,
+    /* Copy file. */
+    badgelink_FsActionType_FsActionCopy = 9,
+    /* Rename / move file. */
+    badgelink_FsActionType_FsActionRename = 10
 } badgelink_FsActionType;
 
 typedef enum _badgelink_NvsActionType {
@@ -213,6 +217,8 @@ typedef struct _badgelink_FsActionReq {
     uint32_t list_offset;
     /* File size (for upload). */
     uint32_t size;
+    /* Destination path (for copy/rename). */
+    char dest_path[1024];
 } badgelink_FsActionReq;
 
 typedef struct _badgelink_FsDirent {
@@ -371,8 +377,8 @@ extern "C" {
 #define _badgelink_XferReq_ARRAYSIZE ((badgelink_XferReq)(badgelink_XferReq_XferFinish+1))
 
 #define _badgelink_FsActionType_MIN badgelink_FsActionType_FsActionList
-#define _badgelink_FsActionType_MAX badgelink_FsActionType_FsActionRmdir
-#define _badgelink_FsActionType_ARRAYSIZE ((badgelink_FsActionType)(badgelink_FsActionType_FsActionRmdir+1))
+#define _badgelink_FsActionType_MAX badgelink_FsActionType_FsActionRename
+#define _badgelink_FsActionType_ARRAYSIZE ((badgelink_FsActionType)(badgelink_FsActionType_FsActionRename+1))
 
 #define _badgelink_NvsActionType_MIN badgelink_NvsActionType_NvsActionList
 #define _badgelink_NvsActionType_MAX badgelink_NvsActionType_NvsActionDelete
@@ -423,7 +429,7 @@ extern "C" {
 #define badgelink_AppfsList_init_default         {0, {badgelink_AppfsMetadata_init_default, badgelink_AppfsMetadata_init_default, badgelink_AppfsMetadata_init_default, badgelink_AppfsMetadata_init_default, badgelink_AppfsMetadata_init_default, badgelink_AppfsMetadata_init_default, badgelink_AppfsMetadata_init_default, badgelink_AppfsMetadata_init_default}, 0}
 #define badgelink_AppfsActionResp_init_default   {0, {badgelink_AppfsMetadata_init_default}, 0}
 #define badgelink_FsStat_init_default            {0, 0, 0, 0, 0}
-#define badgelink_FsActionReq_init_default       {_badgelink_FsActionType_MIN, "", 0, 0, 0}
+#define badgelink_FsActionReq_init_default       {_badgelink_FsActionType_MIN, "", 0, 0, 0, ""}
 #define badgelink_FsDirent_init_default          {"", 0}
 #define badgelink_FsDirentList_init_default      {0, {badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default, badgelink_FsDirent_init_default}, 0}
 #define badgelink_FsActionResp_init_default      {0, {badgelink_FsStat_init_default}, 0}
@@ -443,7 +449,7 @@ extern "C" {
 #define badgelink_AppfsList_init_zero            {0, {badgelink_AppfsMetadata_init_zero, badgelink_AppfsMetadata_init_zero, badgelink_AppfsMetadata_init_zero, badgelink_AppfsMetadata_init_zero, badgelink_AppfsMetadata_init_zero, badgelink_AppfsMetadata_init_zero, badgelink_AppfsMetadata_init_zero, badgelink_AppfsMetadata_init_zero}, 0}
 #define badgelink_AppfsActionResp_init_zero      {0, {badgelink_AppfsMetadata_init_zero}, 0}
 #define badgelink_FsStat_init_zero               {0, 0, 0, 0, 0}
-#define badgelink_FsActionReq_init_zero          {_badgelink_FsActionType_MIN, "", 0, 0, 0}
+#define badgelink_FsActionReq_init_zero          {_badgelink_FsActionType_MIN, "", 0, 0, 0, ""}
 #define badgelink_FsDirent_init_zero             {"", 0}
 #define badgelink_FsDirentList_init_zero         {0, {badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero, badgelink_FsDirent_init_zero}, 0}
 #define badgelink_FsActionResp_init_zero         {0, {badgelink_FsStat_init_zero}, 0}
@@ -486,6 +492,7 @@ extern "C" {
 #define badgelink_FsActionReq_crc32_tag          3
 #define badgelink_FsActionReq_list_offset_tag    4
 #define badgelink_FsActionReq_size_tag           5
+#define badgelink_FsActionReq_dest_path_tag      6
 #define badgelink_FsDirent_name_tag              1
 #define badgelink_FsDirent_is_dir_tag            2
 #define badgelink_FsDirentList_list_tag          1
@@ -656,7 +663,8 @@ X(a, STATIC,   SINGULAR, UENUM,    type,              1) \
 X(a, STATIC,   SINGULAR, STRING,   path,              2) \
 X(a, STATIC,   SINGULAR, UINT32,   crc32,             3) \
 X(a, STATIC,   SINGULAR, UINT32,   list_offset,       4) \
-X(a, STATIC,   SINGULAR, UINT32,   size,              5)
+X(a, STATIC,   SINGULAR, UINT32,   size,              5) \
+X(a, STATIC,   SINGULAR, STRING,   dest_path,         6)
 #define badgelink_FsActionReq_CALLBACK NULL
 #define badgelink_FsActionReq_DEFAULT NULL
 
@@ -780,7 +788,7 @@ extern const pb_msgdesc_t badgelink_NvsActionResp_msg;
 #define badgelink_AppfsList_size                 1030
 #define badgelink_AppfsMetadata_size             126
 #define badgelink_Chunk_size                     4105
-#define badgelink_FsActionReq_size               1046
+#define badgelink_FsActionReq_size               2072
 #define badgelink_FsActionResp_size              4223
 #define badgelink_FsDirentList_size              4214
 #define badgelink_FsDirent_size                  260

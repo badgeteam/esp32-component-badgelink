@@ -12,6 +12,8 @@ enum FsActionType {
   FsActionCrc23 = 6;
   FsActionGetUsage = 7;
   FsActionRmdir = 8;
+  FsActionCopy = 9;
+  FsActionRename = 10;
 }
 
 enum NvsActionType {
@@ -99,6 +101,7 @@ message FsActionReq {
   uint32 crc32 = 3;
   uint32 list_offset = 4;
   uint32 size = 5;
+  string dest_path = 6;
 }
 
 message FsActionResp {

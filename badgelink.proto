@@ -50,6 +50,11 @@ enum StatusCode {
   StatusExists = 10;
 }
 
+enum UsbMode {
+  UsbModeDebug = 0;   // Flash/monitor mode (ESP32 built-in USB-serial/JTAG).
+  UsbModeDevice = 1;  // BadgeLink mode (TinyUSB vendor device).
+}
+
 enum XferReq {
   XferContinue = 0;
   XferAbort = 1;
@@ -194,6 +199,7 @@ message Request {
     StartAppReq start_app = 5;
     XferReq xfer_ctrl = 6;
     VersionReq version_req = 7;
+    SetUsbModeReq set_usb_mode = 8;
   }
 }
 
@@ -212,6 +218,10 @@ message Response {
 message StartAppReq {
   string slug = 1;
   string arg = 2;
+}
+
+message SetUsbModeReq {
+  UsbMode mode = 1;
 }
 
 message VersionReq {

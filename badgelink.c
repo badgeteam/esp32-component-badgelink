@@ -8,6 +8,7 @@
 #include "badgelink_fs.h"
 #include "badgelink_internal.h"
 #include "badgelink_nvs.h"
+#include "badgelink_setusbmode.h"
 #include "badgelink_startapp.h"
 #include "cobs.h"
 #include "esp_crc.h"
@@ -331,6 +332,9 @@ static void handle_packet() {
             break;
         case badgelink_Request_version_req_tag:
             handle_version_req();
+            break;
+        case badgelink_Request_set_usb_mode_tag:
+            badgelink_setusbmode_handle();
             break;
         default:
             badgelink_status_unsupported();

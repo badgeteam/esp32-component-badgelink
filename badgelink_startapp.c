@@ -7,13 +7,6 @@
 #include "esp_log.h"
 #include "esp_system.h"
 #include "freertos/FreeRTOS.h"
-#include "sdkconfig.h"
-
-#ifdef CONFIG_BADGELINK_HOST_TANMATSU_LAUNCHER
-// Provided by the Tanmatsu launcher (main/menu/apps.c). Puts the device
-// into a known state (USB flash/monitor mode, radio off) before launch.
-extern void prepare_device_for_app_launch(void);
-#endif
 
 static char const TAG[] = "badgelink_startapp";
 
@@ -41,9 +34,7 @@ void badgelink_startapp_handle() {
     // Way a bit restarting so the response has time to get back to the host.
     vTaskDelay(pdMS_TO_TICKS(200));
 
-#ifdef CONFIG_BADGELINK_HOST_TANMATSU_LAUNCHER
-    prepare_device_for_app_launch();
-#endif
+    badgelink_call_prepare_device();
 
     esp_restart();
 }

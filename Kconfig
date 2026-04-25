@@ -9,15 +9,4 @@ menu "BadgeLink"
             Each fragment is 32 bytes. Larger values use more memory
             but can handle higher throughput.
 
-    config BADGELINK_HOST_TANMATSU_LAUNCHER
-        bool "Host application is the Tanmatsu launcher"
-        default n
-        help
-            Enable when BadgeLink is built as part of the Tanmatsu launcher
-            firmware. When set, the start-app handler calls the launcher's
-            prepare_device_for_app_launch() hook before booting the selected
-            AppFS slot, so the device is left in a known state (USB in
-            flash/monitor mode, radio powered off) before handing control to
-            the launched app.
-
 endmenu

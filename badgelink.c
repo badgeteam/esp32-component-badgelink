@@ -36,7 +36,33 @@ typedef struct {
     uint8_t len;
 } fragment_t;
 
-static usb_callback_t usb_send_data_cb = NULL;
+static usb_callback_t                 usb_send_data_cb  = NULL;
+static badgelink_prepare_device_cb_t  prepare_device_cb = NULL;
+static badgelink_set_usb_mode_cb_t    set_usb_mode_cb   = NULL;
+
+void badgelink_set_prepare_device_callback(badgelink_prepare_device_cb_t cb) {
+    prepare_device_cb = cb;
+}
+
+void badgelink_set_usb_mode_callback(badgelink_set_usb_mode_cb_t cb) {
+    set_usb_mode_cb = cb;
+}
+
+void badgelink_call_prepare_device(void) {
+    if (prepare_device_cb != NULL) {
+        prepare_device_cb();
+    }
+}
+
+bool badgelink_has_set_usb_mode_callback(void) {
+    return set_usb_mode_cb != NULL;
+}
+
+void badgelink_call_set_usb_mode(badgelink_usb_mode_t mode) {
+    if (set_usb_mode_cb != NULL) {
+        set_usb_mode_cb(mode);
+    }
+}
 
 // Badgelink packet singleton used for both the request and its response.
 badgelink_Packet badgelink_packet;

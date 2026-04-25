@@ -44,6 +44,13 @@ typedef enum _badgelink_XferReq {
     badgelink_XferReq_XferFinish = 2
 } badgelink_XferReq;
 
+typedef enum _badgelink_UsbMode {
+    /* Flash/monitor mode (ESP32 built-in USB-serial/JTAG). */
+    badgelink_UsbMode_UsbModeDebug = 0,
+    /* BadgeLink mode (TinyUSB vendor device). */
+    badgelink_UsbMode_UsbModeDevice = 1
+} badgelink_UsbMode;
+
 typedef enum _badgelink_FsActionType {
     /* List directory / whole AppFS. */
     badgelink_FsActionType_FsActionList = 0,
@@ -124,6 +131,12 @@ typedef struct _badgelink_StartAppReq {
     /* App argument (optional). */
     char arg[128];
 } badgelink_StartAppReq;
+
+/* Set USB mode request. */
+typedef struct _badgelink_SetUsbModeReq {
+    /* Mode to switch USB into. */
+    badgelink_UsbMode mode;
+} badgelink_SetUsbModeReq;
 
 typedef PB_BYTES_ARRAY_T(4096) badgelink_Chunk_data_t;
 /* Upload / download chunk; */
@@ -309,6 +322,8 @@ typedef struct _badgelink_Request {
         badgelink_XferReq xfer_ctrl;
         /* Protocol version request. */
         badgelink_VersionReq version_req;
+        /* Set USB mode request. */
+        badgelink_SetUsbModeReq set_usb_mode;
     } req;
 } badgelink_Request;
 
@@ -376,6 +391,10 @@ extern "C" {
 #define _badgelink_XferReq_MAX badgelink_XferReq_XferFinish
 #define _badgelink_XferReq_ARRAYSIZE ((badgelink_XferReq)(badgelink_XferReq_XferFinish+1))
 
+#define _badgelink_UsbMode_MIN badgelink_UsbMode_UsbModeDebug
+#define _badgelink_UsbMode_MAX badgelink_UsbMode_UsbModeDevice
+#define _badgelink_UsbMode_ARRAYSIZE ((badgelink_UsbMode)(badgelink_UsbMode_UsbModeDevice+1))
+
 #define _badgelink_FsActionType_MIN badgelink_FsActionType_FsActionList
 #define _badgelink_FsActionType_MAX badgelink_FsActionType_FsActionRename
 #define _badgelink_FsActionType_ARRAYSIZE ((badgelink_FsActionType)(badgelink_FsActionType_FsActionRename+1))
@@ -414,6 +433,8 @@ extern "C" {
 #define badgelink_NvsActionReq_type_ENUMTYPE badgelink_NvsActionType
 #define badgelink_NvsActionReq_read_type_ENUMTYPE badgelink_NvsValueType
 
+#define badgelink_SetUsbModeReq_mode_ENUMTYPE badgelink_UsbMode
+
 
 
 
@@ -422,6 +443,7 @@ extern "C" {
 #define badgelink_Request_init_default           {0, {badgelink_Chunk_init_default}}
 #define badgelink_Response_init_default          {_badgelink_StatusCode_MIN, 0, {badgelink_Chunk_init_default}}
 #define badgelink_StartAppReq_init_default       {"", ""}
+#define badgelink_SetUsbModeReq_init_default     {_badgelink_UsbMode_MIN}
 #define badgelink_Chunk_init_default             {0, {0, {0}}}
 #define badgelink_FsUsage_init_default           {0, 0}
 #define badgelink_AppfsMetadata_init_default     {"", "", 0, 0}
@@ -442,6 +464,7 @@ extern "C" {
 #define badgelink_Request_init_zero              {0, {badgelink_Chunk_init_zero}}
 #define badgelink_Response_init_zero             {_badgelink_StatusCode_MIN, 0, {badgelink_Chunk_init_zero}}
 #define badgelink_StartAppReq_init_zero          {"", ""}
+#define badgelink_SetUsbModeReq_init_zero        {_badgelink_UsbMode_MIN}
 #define badgelink_Chunk_init_zero                {0, {0, {0}}}
 #define badgelink_FsUsage_init_zero              {0, 0}
 #define badgelink_AppfsMetadata_init_zero        {"", "", 0, 0}
@@ -522,6 +545,8 @@ extern "C" {
 #define badgelink_Request_start_app_tag          5
 #define badgelink_Request_xfer_ctrl_tag          6
 #define badgelink_Request_version_req_tag        7
+#define badgelink_Request_set_usb_mode_tag       8
+#define badgelink_SetUsbModeReq_mode_tag         1
 #define badgelink_VersionReq_client_version_tag  1
 #define badgelink_VersionResp_server_version_tag 1
 #define badgelink_VersionResp_negotiated_version_tag 2
@@ -558,7 +583,8 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (req,fs_action,req.fs_action),   3) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (req,nvs_action,req.nvs_action),   4) \
 X(a, STATIC,   ONEOF,    MESSAGE,  (req,start_app,req.start_app),   5) \
 X(a, STATIC,   ONEOF,    UENUM,    (req,xfer_ctrl,req.xfer_ctrl),   6) \
-X(a, STATIC,   ONEOF,    MESSAGE,  (req,version_req,req.version_req),   7)
+X(a, STATIC,   ONEOF,    MESSAGE,  (req,version_req,req.version_req),   7) \
+X(a, STATIC,   ONEOF,    MESSAGE,  (req,set_usb_mode,req.set_usb_mode),   8)
 #define badgelink_Request_CALLBACK NULL
 #define badgelink_Request_DEFAULT NULL
 #define badgelink_Request_req_upload_chunk_MSGTYPE badgelink_Chunk
@@ -567,6 +593,7 @@ X(a, STATIC,   ONEOF,    MESSAGE,  (req,version_req,req.version_req),   7)
 #define badgelink_Request_req_nvs_action_MSGTYPE badgelink_NvsActionReq
 #define badgelink_Request_req_start_app_MSGTYPE badgelink_StartAppReq
 #define badgelink_Request_req_version_req_MSGTYPE badgelink_VersionReq
+#define badgelink_Request_req_set_usb_mode_MSGTYPE badgelink_SetUsbModeReq
 
 #define badgelink_Response_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UENUM,    status_code,       1) \
@@ -599,6 +626,11 @@ X(a, STATIC,   SINGULAR, STRING,   slug,              1) \
 X(a, STATIC,   SINGULAR, STRING,   arg,               2)
 #define badgelink_StartAppReq_CALLBACK NULL
 #define badgelink_StartAppReq_DEFAULT NULL
+
+#define badgelink_SetUsbModeReq_FIELDLIST(X, a) \
+X(a, STATIC,   SINGULAR, UENUM,    mode,              1)
+#define badgelink_SetUsbModeReq_CALLBACK NULL
+#define badgelink_SetUsbModeReq_DEFAULT NULL
 
 #define badgelink_Chunk_FIELDLIST(X, a) \
 X(a, STATIC,   SINGULAR, UINT32,   position,          2) \
@@ -738,6 +770,7 @@ extern const pb_msgdesc_t badgelink_Packet_msg;
 extern const pb_msgdesc_t badgelink_Request_msg;
 extern const pb_msgdesc_t badgelink_Response_msg;
 extern const pb_msgdesc_t badgelink_StartAppReq_msg;
+extern const pb_msgdesc_t badgelink_SetUsbModeReq_msg;
 extern const pb_msgdesc_t badgelink_VersionReq_msg;
 extern const pb_msgdesc_t badgelink_VersionResp_msg;
 extern const pb_msgdesc_t badgelink_Chunk_msg;
@@ -762,6 +795,7 @@ extern const pb_msgdesc_t badgelink_NvsActionResp_msg;
 #define badgelink_Request_fields &badgelink_Request_msg
 #define badgelink_Response_fields &badgelink_Response_msg
 #define badgelink_StartAppReq_fields &badgelink_StartAppReq_msg
+#define badgelink_SetUsbModeReq_fields &badgelink_SetUsbModeReq_msg
 #define badgelink_VersionReq_fields &badgelink_VersionReq_msg
 #define badgelink_VersionResp_fields &badgelink_VersionResp_msg
 #define badgelink_Chunk_fields &badgelink_Chunk_msg
@@ -803,6 +837,7 @@ extern const pb_msgdesc_t badgelink_NvsActionResp_msg;
 #define badgelink_Request_size                   4153
 #define badgelink_Response_size                  5134
 #define badgelink_StartAppReq_size               179
+#define badgelink_SetUsbModeReq_size             2
 #define badgelink_VersionReq_size                6
 #define badgelink_VersionResp_size               12
 

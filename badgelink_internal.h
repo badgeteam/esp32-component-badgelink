@@ -37,6 +37,15 @@ void   badgelink_raw_tx(void const* buf, size_t len);
 // Receive raw bytes of data.
 size_t badgelink_raw_rx(void* buf, size_t max_len);
 
+// Internal: invoke the registered prepare-device callback, no-op if unset.
+void badgelink_call_prepare_device(void);
+
+// Internal: returns true if a set-USB-mode callback has been registered.
+bool badgelink_has_set_usb_mode_callback(void);
+
+// Internal: invoke the registered set-USB-mode callback. No-op if unset.
+void badgelink_call_set_usb_mode(badgelink_usb_mode_t mode);
+
 // Encode and send a packet.
 void badgelink_send_packet();
 // Send a status response packet.

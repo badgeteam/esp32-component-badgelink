@@ -18,6 +18,9 @@ PB_BIND(badgelink_Response, badgelink_Response, 4)
 PB_BIND(badgelink_StartAppReq, badgelink_StartAppReq, AUTO)
 
 
+PB_BIND(badgelink_SetUsbModeReq, badgelink_SetUsbModeReq, AUTO)
+
+
 PB_BIND(badgelink_VersionReq, badgelink_VersionReq, AUTO)
 
 

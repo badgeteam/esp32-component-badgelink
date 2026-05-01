@@ -359,6 +359,8 @@ class BadgelinkConnection:
             request = Request(upload_chunk=request)
         elif type(request) == StartAppReq:
             request = Request(start_app=request)
+        elif type(request) == SetUsbModeReq:
+            request = Request(set_usb_mode=request)
         elif type(request) == VersionReq:
             request = Request(version_req=request)
         elif type(request) != Request:
@@ -449,10 +451,21 @@ class Badgelink:
     def start_app(self, slug: str, app_arg: str):
         """
         Start an app that is installed on the badge.
-        
+
         Raises `NotFoundError` if the requested app does not exist.
         """
         self.conn.simple_request(StartAppReq(slug=slug, arg=app_arg), f"App `{slug}`", timeout=self.def_timeout)
+
+    def set_usb_mode(self, mode: 'UsbMode'):
+        """
+        Switch the badge's USB peripheral between BadgeLink (USB_DEVICE) and
+        flash/monitor (USB_DEBUG) mode.
+
+        The badge replies OK before actually switching. Once switched away
+        from USB_DEVICE mode the connection will drop, so further requests
+        will fail.
+        """
+        self.conn.simple_request(SetUsbModeReq(mode=mode), timeout=self.def_timeout)
     
     def nvs_read(self, namespace: str, key: str, nvs_type: NvsValueType) -> NvsValue:
         """
@@ -951,6 +964,10 @@ if __name__ == "__main__":
             help_start              = "Start an app that is installed on the badge"
             help_start_slug         = "ID of the app to start"
             help_start_arg          = "Argument to pass to the app being started"
+
+        if 1:
+            help_mode               = "Switch the badge's USB peripheral mode"
+            help_mode_target        = "Target mode: 'usb'/'debug' for flash/monitor, 'device'/'badgelink' for BadgeLink"
         
         if 1:
             help_nvs                = "Read or write the settings (ESP NVS)"
@@ -997,6 +1014,11 @@ if __name__ == "__main__":
         p_start = subparsers.add_parser("start", help=help_start)
         p_start.add_argument("slug", type=appfs_slug, help=help_start_slug)
         p_start.add_argument("app_arg", type=app_arg, nargs="?", default="", help=help_start_arg)
+
+    # ==== USB mode parser ==== #
+    if 1:
+        p_mode = subparsers.add_parser("mode", help=help_mode)
+        p_mode.add_argument("target", choices=["usb", "debug", "device", "badgelink"], help=help_mode_target)
     
     # ==== NVS parsers ==== #
     if 1:
@@ -1134,6 +1156,10 @@ if __name__ == "__main__":
         
         if args.request == "start":
             link.start_app(args.slug, args.app_arg)
+
+        elif args.request == "mode":
+            target_mode = UsbModeDebug if args.target in ("usb", "debug") else UsbModeDevice
+            link.set_usb_mode(target_mode)
             
         elif args.request == "nvs":
             # ==== NVS implementations ==== #

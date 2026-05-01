@@ -7,6 +7,7 @@ idf_component_register(
 		badgelink_fs.c
 		badgelink_nvs.c
 		badgelink_startapp.c
+		badgelink_setusbmode.c
 		badgelink.c
 		badgelink.pb.c
 		cobs.c

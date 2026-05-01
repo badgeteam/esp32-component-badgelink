@@ -33,5 +33,8 @@ void badgelink_startapp_handle() {
 
     // Way a bit restarting so the response has time to get back to the host.
     vTaskDelay(pdMS_TO_TICKS(200));
+
+    badgelink_call_prepare_device();
+
     esp_restart();
 }

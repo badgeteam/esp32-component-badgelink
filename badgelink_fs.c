@@ -24,8 +24,8 @@ static char const TAG[] = "badgelink_fs";
 #endif
 #define BADGELINK_STDIO_BUF_SIZE CONFIG_FATFS_STDIO_BUF_SIZE
 
-static FILE*  bl_fast_file   = NULL;
-static void*  bl_fast_buffer = NULL;
+static FILE* bl_fast_file   = NULL;
+static void* bl_fast_buffer = NULL;
 
 static FILE* bl_sd_fopen(const char* path, const char* mode) {
     FILE* f = fopen(path, mode);
@@ -380,9 +380,9 @@ void badgelink_fs_download() {
         uint8_t  tmp[128];
         uint32_t rcount = 1;
         while (rcount) {
-            rcount = fread(tmp, 1, sizeof(tmp), xfer_fd);
-            crc    = esp_crc32_le(crc, tmp, rcount);
-            size  += rcount;
+            rcount  = fread(tmp, 1, sizeof(tmp), xfer_fd);
+            crc     = esp_crc32_le(crc, tmp, rcount);
+            size   += rcount;
         }
         fseek(xfer_fd, 0, SEEK_SET);
     }
@@ -492,8 +492,10 @@ static badgelink_StatusCode fs_copy_file(char const* src_path, char const* dst_p
         } else {
             code = badgelink_StatusCode_StatusInternalError;
         }
-        if (src_is_sd) bl_sd_fclose(src);
-        else fclose(src);
+        if (src_is_sd)
+            bl_sd_fclose(src);
+        else
+            fclose(src);
         return code;
     }
 
@@ -510,8 +512,10 @@ static badgelink_StatusCode fs_copy_file(char const* src_path, char const* dst_p
     if (ferror(src)) error = true;
 
     // Close both files.
-    if (src_is_sd) bl_sd_fclose(src);
-    else fclose(src);
+    if (src_is_sd)
+        bl_sd_fclose(src);
+    else
+        fclose(src);
     fclose(dst);
 
     if (error) {
@@ -533,8 +537,10 @@ void badgelink_fs_copy() {
     // Check source exists and is a file.
     struct stat src_stat;
     if (stat(req->path, &src_stat)) {
-        if (errno == ENOENT) badgelink_status_not_found();
-        else badgelink_status_int_err();
+        if (errno == ENOENT)
+            badgelink_status_not_found();
+        else
+            badgelink_status_int_err();
         return;
     }
     if (S_ISDIR(src_stat.st_mode)) {
@@ -572,8 +578,10 @@ void badgelink_fs_rename() {
         // Cross-device: only supported for files, not directories.
         struct stat src_stat;
         if (stat(req->path, &src_stat)) {
-            if (errno == ENOENT) badgelink_status_not_found();
-            else badgelink_status_int_err();
+            if (errno == ENOENT)
+                badgelink_status_not_found();
+            else
+                badgelink_status_int_err();
             return;
         }
         if (S_ISDIR(src_stat.st_mode)) {

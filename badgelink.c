@@ -36,9 +36,9 @@ typedef struct {
     uint8_t len;
 } fragment_t;
 
-static usb_callback_t                 usb_send_data_cb  = NULL;
-static badgelink_prepare_device_cb_t  prepare_device_cb = NULL;
-static badgelink_set_usb_mode_cb_t    set_usb_mode_cb   = NULL;
+static usb_callback_t                usb_send_data_cb  = NULL;
+static badgelink_prepare_device_cb_t prepare_device_cb = NULL;
+static badgelink_set_usb_mode_cb_t   set_usb_mode_cb   = NULL;
 
 void badgelink_set_prepare_device_callback(badgelink_prepare_device_cb_t cb) {
     prepare_device_cb = cb;
@@ -172,8 +172,8 @@ uint16_t badgelink_get_protocol_version() {
 
 // Handle a version negotiation request.
 static void handle_version_req() {
-    badgelink_VersionReq* req = &badgelink_packet.packet.request.req.version_req;
-    uint16_t client_version   = req->client_version;
+    badgelink_VersionReq* req            = &badgelink_packet.packet.request.req.version_req;
+    uint16_t              client_version = req->client_version;
 
     // Negotiate: use the lower of client and server versions.
     uint16_t negotiated = client_version < BADGELINK_PROTOCOL_VERSION ? client_version : BADGELINK_PROTOCOL_VERSION;
@@ -183,10 +183,10 @@ static void handle_version_req() {
              BADGELINK_PROTOCOL_VERSION, negotiated);
 
     // Send response with server version and negotiated version.
-    badgelink_packet.which_packet                                        = badgelink_Packet_response_tag;
-    badgelink_packet.packet.response.status_code                         = badgelink_StatusCode_StatusOk;
-    badgelink_packet.packet.response.which_resp                          = badgelink_Response_version_resp_tag;
-    badgelink_packet.packet.response.resp.version_resp.server_version    = BADGELINK_PROTOCOL_VERSION;
+    badgelink_packet.which_packet                                         = badgelink_Packet_response_tag;
+    badgelink_packet.packet.response.status_code                          = badgelink_StatusCode_StatusOk;
+    badgelink_packet.packet.response.which_resp                           = badgelink_Response_version_resp_tag;
+    badgelink_packet.packet.response.resp.version_resp.server_version     = BADGELINK_PROTOCOL_VERSION;
     badgelink_packet.packet.response.resp.version_resp.negotiated_version = negotiated;
     badgelink_send_packet();
 }
